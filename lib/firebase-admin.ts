@@ -9,7 +9,20 @@ function getFirebaseAdminApp(): App {
 
     const projectId = process.env.FIREBASE_PROJECT_ID
     const clientEmail = process.env.FIREBASE_CLIENT_EMAIL
-    const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n")
+    let privateKey = process.env.FIREBASE_PRIVATE_KEY
+
+    // If the key doesn't start with the PEM header, assume it's base64 encoded
+    if (privateKey && !privateKey.startsWith("-----BEGIN PRIVATE KEY-----")) {
+        try {
+            privateKey = Buffer.from(privateKey, "base64").toString("utf-8")
+        } catch (e) {
+            console.warn("Failed to decode base64 FIREBASE_PRIVATE_KEY")
+        }
+    }
+
+    // Still perform the standard \n replacement for literal string formats
+    privateKey = privateKey?.replace(/\\n/g, "\n")
+
     const storageBucket = process.env.FIREBASE_STORAGE_BUCKET
 
     if (!projectId || !clientEmail || !privateKey || !storageBucket) {

@@ -73,6 +73,10 @@ npm run dev
   - Returns single invoice (tenant-scoped).
 - `DELETE /api/invoices/:id`
   - Deletes invoice metadata + file (tenant-scoped).
+- `POST /api/admin/login`
+  - Validates internal admin credentials and sets secure admin session cookie.
+- `POST /api/admin/logout`
+  - Clears admin session cookie.
 
 ## 7. Collections used
 
@@ -100,3 +104,6 @@ npm run dev
 
 - This is a production baseline MVP for auth + invoice ingestion + tenant isolation.
 - Dispute automation, OCR orchestration, AIS verification, and tariff pipelines should run as async workers behind queue/event triggers (recommended next phase).
+- Admin panel access:
+  - Press `Cmd/Ctrl + Shift + K` on the landing page to open admin login.
+  - Successful login redirects to `/admin`.

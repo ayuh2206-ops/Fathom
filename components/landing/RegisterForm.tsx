@@ -9,7 +9,11 @@ import { Progress } from "@/components/ui/progress"
 import { Check, ChevronRight, ChevronLeft, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
+import { signIn } from "next-auth/react"
+import { useRouter } from "next/navigation"
+
 export function RegisterForm() {
+    const router = useRouter()
     const [step, setStep] = React.useState(1)
     const [isLoading, setIsLoading] = React.useState(false)
     const totalSteps = 3
@@ -63,11 +67,19 @@ export function RegisterForm() {
                 throw new Error(data.message || 'Registration failed')
             }
 
-            // Auto-login or redirect to dashboard (or show verify email message)
-            // For now, we'll just show success
-            alert("Registration successful. You can now sign in.")
-            // In a real app, sign in immediately:
-            // signIn('credentials', { email: formData.email, password: formData.password })
+            // Auto-login and redirect to dashboard
+            const signInResult = await signIn('credentials', {
+                email: formData.email,
+                password: formData.password,
+                redirect: false
+            })
+
+            if (signInResult?.error) {
+                alert("Registration successful, but login failed. Please sign in manually.")
+                router.push('/?login=true')
+            } else {
+                router.push('/dashboard')
+            }
 
         } catch (error: unknown) {
             alert(getErrorMessage(error))
@@ -308,10 +320,10 @@ export function RegisterForm() {
         </div>
     )
 }
-    const getErrorMessage = (error: unknown) => {
-        if (error instanceof Error) {
-            return error.message
-        }
-
-        return "Registration failed"
+const getErrorMessage = (error: unknown) => {
+    if (error instanceof Error) {
+        return error.message
     }
+
+    return "Registration failed"
+}

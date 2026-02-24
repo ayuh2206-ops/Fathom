@@ -39,50 +39,47 @@ export async function POST(req: Request) {
         const email = normalizeEmail(parsed.data.email)
         const passwordHash = await hashPassword(parsed.data.password)
         const verificationToken = generateVerificationToken()
-        // const firestore = getFirebaseFirestore()
+        const firestore = getFirebaseFirestore()
 
-        // const organizationRef = firestore.collection("organizations").doc()
-        // const userRef = firestore.collection("users").doc()
-        // const userEmailRef = firestore.collection("userEmails").doc(email)
+        const organizationRef = firestore.collection("organizations").doc()
+        const userRef = firestore.collection("users").doc()
+        const userEmailRef = firestore.collection("userEmails").doc(email)
 
-        // await firestore.runTransaction(async (tx) => {
-        //     const existingEmail = await tx.get(userEmailRef)
+        await firestore.runTransaction(async (tx) => {
+            const existingEmail = await tx.get(userEmailRef)
 
-        //     if (existingEmail.exists) {
-        //         throw new Error("EMAIL_EXISTS")
-        //     }
+            if (existingEmail.exists) {
+                throw new Error("EMAIL_EXISTS")
+            }
 
-        //     tx.set(organizationRef, {
-        //         name: parsed.data.companyName?.trim() || `${fullName}'s Organization`,
-        //         subscriptionPlan: parsed.data.plan,
-        //         companySize: parsed.data.companySize || null,
-        //         fleetSize: parsed.data.fleetSize || null,
-        //         phone: parsed.data.phone || null,
-        //         createdAt: FieldValue.serverTimestamp(),
-        //         updatedAt: FieldValue.serverTimestamp(),
-        //     })
+            tx.set(organizationRef, {
+                name: parsed.data.companyName?.trim() || `${fullName}'s Organization`,
+                subscriptionPlan: parsed.data.plan,
+                companySize: parsed.data.companySize || null,
+                fleetSize: parsed.data.fleetSize || null,
+                phone: parsed.data.phone || null,
+                createdAt: FieldValue.serverTimestamp(),
+                updatedAt: FieldValue.serverTimestamp(),
+            })
 
-        //     tx.set(userRef, {
-        //         email,
-        //         fullName,
-        //         passwordHash,
-        //         organizationId: organizationRef.id,
-        //         role: "owner",
-        //         emailVerified: null,
-        //         verificationToken,
-        //         createdAt: FieldValue.serverTimestamp(),
-        //         updatedAt: FieldValue.serverTimestamp(),
-        //     })
+            tx.set(userRef, {
+                email,
+                fullName,
+                passwordHash,
+                organizationId: organizationRef.id,
+                role: "owner",
+                emailVerified: null,
+                verificationToken,
+                createdAt: FieldValue.serverTimestamp(),
+                updatedAt: FieldValue.serverTimestamp(),
+            })
 
-        //     tx.set(userEmailRef, {
-        //         userId: userRef.id,
-        //         email,
-        //         createdAt: FieldValue.serverTimestamp(),
-        //     })
-        // })
-
-        // Mock success for local UI testing without proper Firebase project configs
-        await new Promise(resolve => setTimeout(resolve, 500))
+            tx.set(userEmailRef, {
+                userId: userRef.id,
+                email,
+                createdAt: FieldValue.serverTimestamp(),
+            })
+        })
 
         return NextResponse.json({ message: "User registered successfully" }, { status: 201 })
     } catch (error) {

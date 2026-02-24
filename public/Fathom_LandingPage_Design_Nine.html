@@ -1386,5 +1386,188 @@
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
     </script>
+
+    <div id="fathom-admin-overlay" style="display: none;">
+        <div class="fa-admin-backdrop"></div>
+        <div class="fa-admin-modal">
+            <h3>Admin Access</h3>
+            <p>Sign in to open the FATHOM admin panel.</p>
+            <form id="fathom-admin-form">
+                <label for="fathom-admin-name">Name</label>
+                <input id="fathom-admin-name" name="name" type="text" autocomplete="username" required />
+
+                <label for="fathom-admin-password">Password</label>
+                <input id="fathom-admin-password" name="password" type="password" autocomplete="current-password" required />
+
+                <p id="fathom-admin-error"></p>
+                <div class="fa-admin-actions">
+                    <button type="button" id="fathom-admin-cancel">Cancel</button>
+                    <button type="submit" id="fathom-admin-submit">Login</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <style>
+        #fathom-admin-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+        #fathom-admin-overlay.is-open {
+            display: flex !important;
+        }
+        #fathom-admin-overlay .fa-admin-backdrop {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.72);
+            backdrop-filter: blur(8px);
+        }
+        #fathom-admin-overlay .fa-admin-modal {
+            position: relative;
+            width: min(420px, 100%);
+            background: #0b1220;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 16px;
+            padding: 24px;
+            color: #e2e8f0;
+            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.6);
+        }
+        #fathom-admin-overlay .fa-admin-modal h3 {
+            margin: 0;
+            font-family: 'Cinzel', serif;
+            font-size: 24px;
+            color: #fff;
+        }
+        #fathom-admin-overlay .fa-admin-modal p {
+            margin-top: 8px;
+            margin-bottom: 18px;
+            color: #94a3b8;
+            font-size: 14px;
+        }
+        #fathom-admin-overlay .fa-admin-modal label {
+            display: block;
+            margin-top: 12px;
+            margin-bottom: 6px;
+            font-size: 12px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #93c5fd;
+        }
+        #fathom-admin-overlay .fa-admin-modal input {
+            width: 100%;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            background: #111827;
+            color: #fff;
+            padding: 11px 12px;
+            outline: none;
+        }
+        #fathom-admin-overlay .fa-admin-modal input:focus {
+            border-color: rgba(56, 189, 248, 0.9);
+            box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.16);
+        }
+        #fathom-admin-error {
+            min-height: 18px;
+            margin-top: 10px;
+            margin-bottom: 0;
+            font-size: 13px;
+            color: #fca5a5;
+        }
+        #fathom-admin-overlay .fa-admin-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 18px;
+        }
+        #fathom-admin-overlay .fa-admin-actions button {
+            border-radius: 999px;
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            background: rgba(255, 255, 255, 0.05);
+            color: #e2e8f0;
+            padding: 10px 18px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        #fathom-admin-overlay .fa-admin-actions button#fathom-admin-submit {
+            background: linear-gradient(90deg, #2563eb, #0ea5e9);
+            border-color: rgba(14, 165, 233, 0.55);
+            color: #fff;
+        }
+    </style>
+
+    <script>
+        (function () {
+            const overlay = document.getElementById("fathom-admin-overlay");
+            const backdrop = overlay.querySelector(".fa-admin-backdrop");
+            const form = document.getElementById("fathom-admin-form");
+            const cancelButton = document.getElementById("fathom-admin-cancel");
+            const submitButton = document.getElementById("fathom-admin-submit");
+            const nameInput = document.getElementById("fathom-admin-name");
+            const passwordInput = document.getElementById("fathom-admin-password");
+            const errorBox = document.getElementById("fathom-admin-error");
+
+            const openOverlay = () => {
+                overlay.classList.add("is-open");
+                errorBox.textContent = "";
+                nameInput.focus();
+            };
+
+            const closeOverlay = () => {
+                overlay.classList.remove("is-open");
+                form.reset();
+                errorBox.textContent = "";
+            };
+
+            document.addEventListener("keydown", function (event) {
+                const isHotkey = (event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === "k";
+                if (isHotkey) {
+                    event.preventDefault();
+                    openOverlay();
+                }
+
+                if (event.key === "Escape" && overlay.classList.contains("is-open")) {
+                    closeOverlay();
+                }
+            });
+
+            backdrop.addEventListener("click", closeOverlay);
+            cancelButton.addEventListener("click", closeOverlay);
+
+            form.addEventListener("submit", async function (event) {
+                event.preventDefault();
+                errorBox.textContent = "";
+
+                submitButton.disabled = true;
+                submitButton.textContent = "Checking...";
+
+                try {
+                    const response = await fetch("/api/admin/login", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            name: nameInput.value,
+                            password: passwordInput.value,
+                        }),
+                    });
+
+                    if (!response.ok) {
+                        errorBox.textContent = "Invalid admin credentials.";
+                        return;
+                    }
+
+                    window.location.href = "/admin";
+                } catch (error) {
+                    errorBox.textContent = "Unable to login right now. Try again.";
+                } finally {
+                    submitButton.disabled = false;
+                    submitButton.textContent = "Login";
+                }
+            });
+        })();
+    </script>
 </body>
 </html>

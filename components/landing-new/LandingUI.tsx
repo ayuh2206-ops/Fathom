@@ -385,9 +385,9 @@ export default function LandingUI() {
         }
 
         const handleKeyDown = (e: KeyboardEvent) => {
-            if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'k') {
+            if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key.toLowerCase() === 'k' || e.code === 'KeyK')) {
                 e.preventDefault();
-                router.push('/admin');
+                window.location.href = '/admin';
             }
         };
         window.addEventListener('keydown', handleKeyDown);

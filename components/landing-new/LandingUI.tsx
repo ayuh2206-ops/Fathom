@@ -385,7 +385,7 @@ export default function LandingUI() {
         }
 
         const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.metaKey && e.shiftKey && e.key.toLowerCase() === 'k') {
+            if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'k') {
                 e.preventDefault();
                 router.push('/admin');
             }

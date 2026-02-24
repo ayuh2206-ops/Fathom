@@ -15,7 +15,7 @@ function getFirebaseAdminApp(): App {
     if (privateKey && !privateKey.startsWith("-----BEGIN PRIVATE KEY-----")) {
         try {
             privateKey = Buffer.from(privateKey, "base64").toString("utf-8")
-        } catch (_e) {
+        } catch {
             console.warn("Failed to decode base64 FIREBASE_PRIVATE_KEY")
         }
     }

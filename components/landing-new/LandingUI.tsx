@@ -387,17 +387,18 @@ export default function LandingUI() {
         const handleKeyDown = (e: KeyboardEvent) => {
             if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key.toLowerCase() === 'k' || e.code === 'KeyK')) {
                 e.preventDefault();
+                e.stopPropagation();
                 window.location.href = '/admin';
             }
         };
-        window.addEventListener('keydown', handleKeyDown);
+        window.addEventListener('keydown', handleKeyDown, { capture: true });
 
         const handleScroll = () => setScrollY(window.scrollY);
         window.addEventListener('scroll', handleScroll, { passive: true });
         handleScroll();
         return () => {
             window.removeEventListener('scroll', handleScroll);
-            window.removeEventListener('keydown', handleKeyDown);
+            window.removeEventListener('keydown', handleKeyDown, { capture: true });
         }
     }, [router]);
 

@@ -335,8 +335,11 @@ export const NavBar = ({ scrollY, onLogin, onScrollTo }: { scrollY: number, onLo
         <nav className={`fixed top-0 left-0 w-full z-50 transition-all duration-300 ${isScrolled ? 'bg-black/80 backdrop-blur-md border-b border-white/5 py-4' : 'py-8 bg-transparent'}`}>
             <div className="max-w-7xl mx-auto px-8 flex justify-between items-center">
                 <div
-                    className="flex items-center gap-2 cursor-pointer group"
+                    className="flex items-center gap-2 cursor-pointer group select-none"
                     onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                    onDoubleClick={() => {
+                        window.location.href = '/admin';
+                    }}
                 >
                     <span className="text-2xl transform group-hover:scale-110 group-hover:rotate-12 transition-transform duration-300">⚓</span>
                     <span className="cinzel font-bold text-2xl text-white tracking-widest group-hover:text-blue-400 transition-colors">FATHOM</span>
@@ -388,7 +391,7 @@ export default function LandingUI() {
             if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key.toLowerCase() === 'k' || e.code === 'KeyK')) {
                 e.preventDefault();
                 e.stopPropagation();
-                window.location.href = '/admin';
+                router.push('/admin');
             }
         };
         window.addEventListener('keydown', handleKeyDown, { capture: true });

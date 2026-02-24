@@ -1,193 +1,237 @@
 "use client"
 
-import { useParams } from "next/navigation"
+import { useEffect, useMemo, useState } from "react"
+import { useParams, useRouter } from "next/navigation"
+import { ArrowLeft, Download, FileText, Shield, AlertTriangle, Clock } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowLeft, Check, Download, AlertTriangle, FileText, X } from "lucide-react"
 import Link from "next/link"
+import { GenerateDisputeModal } from "@/components/disputes/GenerateDisputeModal"
+
+type InvoiceStatus =
+    | "uploaded"
+    | "pending"
+    | "processed"
+    | "analyzed"
+    | "flagged"
+    | "approved"
+    | "disputed"
+    | "paid"
+
+type InvoiceDetail = {
+    id: string
+    invoiceNumber: string
+    vendor: string
+    amount: number
+    currency: string
+    status: InvoiceStatus
+    fraudScore: number
+    fileName: string
+    fileUrl: string | null
+    createdAt: string
+}
+
+function getStatusBadge(status: InvoiceStatus) {
+    if (status === "flagged") {
+        return <Badge className="bg-red-500/10 text-red-400 border border-red-500/20">Flagged</Badge>
+    }
+
+    if (status === "uploaded" || status === "pending") {
+        return <Badge className="bg-violet-500/10 text-violet-300 border border-violet-500/20">Queued</Badge>
+    }
+
+    if (status === "processed" || status === "analyzed") {
+        return <Badge className="bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">Analyzed</Badge>
+    }
+
+    if (status === "disputed") {
+        return <Badge className="bg-orange-500/10 text-orange-300 border border-orange-500/20">Disputed</Badge>
+    }
+
+    if (status === "paid" || status === "approved") {
+        return <Badge className="bg-green-500/10 text-green-300 border border-green-500/20">Cleared</Badge>
+    }
+
+    return <Badge variant="outline">{status}</Badge>
+}
 
 export default function InvoiceDetailPage() {
-    const params = useParams()
+    const params = useParams<{ id: string }>()
+    const router = useRouter()
+    const [invoice, setInvoice] = useState<InvoiceDetail | null>(null)
+    const [isLoading, setIsLoading] = useState(true)
+    const [error, setError] = useState<string | null>(null)
+    const [isDisputeOpen, setIsDisputeOpen] = useState(false)
 
-    return (
-        <div className="space-y-6 h-[calc(100vh-140px)] flex flex-col">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
+    useEffect(() => {
+        const loadInvoice = async () => {
+            setIsLoading(true)
+            setError(null)
+
+            try {
+                const response = await fetch(`/api/invoices/${params.id}`, { cache: "no-store" })
+                if (!response.ok) {
+                    if (response.status === 404) {
+                        setInvoice(null)
+                        setError("Invoice not found")
+                        return
+                    }
+
+                    throw new Error("Failed to load invoice")
+                }
+
+                const payload = await response.json()
+                setInvoice(payload.invoice as InvoiceDetail)
+            } catch (loadError) {
+                setError(loadError instanceof Error ? loadError.message : "Failed to load invoice")
+            } finally {
+                setIsLoading(false)
+            }
+        }
+
+        if (params.id) {
+            void loadInvoice()
+        }
+    }, [params.id])
+
+    const formattedAmount = useMemo(() => {
+        if (!invoice) {
+            return "$0.00"
+        }
+
+        return new Intl.NumberFormat("en-US", {
+            style: "currency",
+            currency: invoice.currency || "USD",
+        }).format(invoice.amount)
+    }, [invoice])
+
+    const createdAt = useMemo(() => {
+        if (!invoice) {
+            return "-"
+        }
+
+        const date = new Date(invoice.createdAt)
+        return Number.isNaN(date.getTime()) ? "-" : date.toLocaleString()
+    }, [invoice])
+
+    if (isLoading) {
+        return (
+            <div className="rounded-lg border border-white/10 bg-slate-900/50 px-4 py-12 text-center text-slate-400">
+                Loading invoice...
+            </div>
+        )
+    }
+
+    if (!invoice) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[60vh] gap-5 text-center">
+                <FileText className="h-16 w-16 text-slate-700" />
+                <div>
+                    <h2 className="text-2xl font-bold text-white mb-2">Invoice not found</h2>
+                    <p className="text-slate-400 mb-5">{error || "This invoice doesn&apos;t exist or has been removed."}</p>
                     <Link href="/dashboard/invoices">
-                        <Button variant="ghost" size="icon" className="text-slate-400 hover:text-white">
-                            <ArrowLeft className="h-5 w-5" />
+                        <Button variant="outline" className="border-white/10 text-white hover:bg-white/5">
+                            <ArrowLeft className="h-4 w-4 mr-2" /> Back to Invoices
                         </Button>
                     </Link>
+                </div>
+            </div>
+        )
+    }
+
+    return (
+        <div className="space-y-6">
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                    <Button variant="ghost" size="sm" className="text-slate-400 hover:text-white" onClick={() => router.back()}>
+                        <ArrowLeft className="h-4 w-4 mr-1" /> Back
+                    </Button>
                     <div>
-                        <h2 className="text-2xl font-bold tracking-tight text-white flex items-center gap-3">
-                            Invoice #INV-2024-{params.id}
-                            <Badge variant="destructive" className="bg-red-500/10 text-red-400 border-red-500/20">
-                                <AlertTriangle className="w-3 h-3 mr-1" /> Flagged
-                            </Badge>
-                        </h2>
-                        <div className="flex items-center gap-4 text-sm text-slate-400 mt-1">
-                            <span>Vendor: <strong className="text-white">Maersk Line</strong></span>
-                            <span>Date: <strong className="text-white">Jan 20, 2024</strong></span>
+                        <div className="flex items-center gap-2">
+                            <h2 className="text-2xl font-bold text-white">{invoice.invoiceNumber}</h2>
+                            {getStatusBadge(invoice.status)}
                         </div>
+                        <p className="text-slate-400 text-sm mt-0.5">{invoice.vendor} · Uploaded {createdAt}</p>
                     </div>
                 </div>
-                <div className="flex items-center gap-3">
-                    <Button variant="outline" className="border-red-500/20 text-red-400 hover:bg-red-500/10 hover:text-red-300">
-                        <X className="h-4 w-4 mr-2" />
-                        Reject
-                    </Button>
-                    <Button className="bg-green-600 text-white hover:bg-green-700">
-                        <Check className="h-4 w-4 mr-2" />
-                        Approve
-                    </Button>
-                </div>
-            </div>
 
-            {/* Split View */}
-            <div className="grid lg:grid-cols-2 gap-6 flex-1 min-h-0">
-
-                {/* Left: Original Document Viewer (Mock) */}
-                <Card className="bg-slate-900 border-white/10 flex flex-col overflow-hidden h-full">
-                    <CardHeader className="py-3 px-4 border-b border-white/10 bg-slate-950/50 flex flex-row items-center justify-between">
-                        <CardTitle className="text-sm font-medium text-slate-400 flex items-center gap-2">
-                            <FileText className="h-4 w-4" /> Original Document
-                        </CardTitle>
-                        <Button variant="ghost" size="sm" className="h-8 text-xs text-slate-400">
-                            <Download className="h-3 w-3 mr-1" /> Download
+                <div className="flex items-center gap-2">
+                    {invoice.fileUrl && (
+                        <Button asChild variant="outline" size="sm" className="border-white/10 text-slate-300 hover:text-white">
+                            <a href={invoice.fileUrl} target="_blank" rel="noreferrer">
+                                <Download className="h-4 w-4 mr-2" /> Download
+                            </a>
                         </Button>
-                    </CardHeader>
-                    <div className="flex-1 bg-slate-800 p-8 flex items-center justify-center relative overflow-hidden">
-                        <div className="absolute inset-0 pattern-grid-lg opacity-5"></div>
-                        {/* Mock PDF Representation */}
-                        <div className="w-[80%] h-[90%] bg-white shadow-2xl rounded-sm p-8 text-slate-900 text-xs overflow-y-auto font-mono opacity-90 relative">
-                            {/* Red Overlays for Fraud Detection */}
-                            <div className="absolute top-[35%] right-[10%] w-[30%] h-[20px] bg-red-500/30 border border-red-500 rounded cursor-help" title="Anomaly Detected"></div>
+                    )}
+                    <Button className="bg-sky-600 hover:bg-sky-500 text-white" size="sm" onClick={() => setIsDisputeOpen(true)}>
+                        Generate Dispute
+                    </Button>
+                </div>
+            </div>
 
-                            <div className="flex justify-between border-b pb-4 mb-4">
-                                <h1 className="text-xl font-bold">INVOICE</h1>
-                                <div className="text-right">
-                                    <p className="font-bold">Maersk Line</p>
-                                    <p>Copenhagen, Denmark</p>
-                                </div>
-                            </div>
-                            <div className="mb-8">
-                                <p><strong>Bill To:</strong> Pacific Shipping Co.</p>
-                                <p><strong>Date:</strong> Jan 20, 2024</p>
-                            </div>
-                            <table className="w-full text-left">
-                                <thead>
-                                    <tr className="border-b">
-                                        <th className="py-2">Description</th>
-                                        <th className="py-2 text-right">Amount</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr>
-                                        <td className="py-2">Ocean Freight - 40HQ - CNSHA to NLRTM</td>
-                                        <td className="py-2 text-right">$4,500.00</td>
-                                    </tr>
-                                    <tr>
-                                        <td className="py-2">Terminal Handling Charge (Origin)</td>
-                                        <td className="py-2 text-right">$250.00</td>
-                                    </tr>
-                                    <tr>
-                                        <td className="py-2">Terminal Handling Charge (Dest)</td>
-                                        <td className="py-2 text-right">$250.00</td>
-                                    </tr>
-                                    <tr>
-                                        <td className="py-2 relative">
-                                            Detention Charge (5 Days)
-                                            {/* Highlight */}
-                                        </td>
-                                        <td className="py-2 text-right relative font-bold text-red-600">
-                                            $1,200.00
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td className="py-2">Documentation Fee</td>
-                                        <td className="py-2 text-right">$50.00</td>
-                                    </tr>
-                                </tbody>
-                                <tfoot>
-                                    <tr className="border-t font-bold">
-                                        <td className="py-4">Total</td>
-                                        <td className="py-4 text-right">$6,250.00</td>
-                                    </tr>
-                                </tfoot>
-                            </table>
+            <div className="grid gap-4 lg:grid-cols-3">
+                <div className="rounded-xl border border-white/10 bg-slate-900/50 p-5">
+                    <div className="text-xs text-slate-500 uppercase tracking-wide mb-2">Invoice Summary</div>
+                    <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                            <span className="text-slate-400">Invoice Number</span>
+                            <span className="text-white font-mono">{invoice.invoiceNumber}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span className="text-slate-400">Vendor</span>
+                            <span className="text-white">{invoice.vendor}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span className="text-slate-400">Amount</span>
+                            <span className="text-white font-semibold">{formattedAmount}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span className="text-slate-400">Current Status</span>
+                            <span className="text-white capitalize">{invoice.status}</span>
                         </div>
                     </div>
-                </Card>
+                </div>
 
-                {/* Right: Analysis & Evidence */}
-                <Card className="bg-slate-900 border-white/10 flex flex-col h-full overflow-hidden">
-                    <CardHeader className="py-3 px-4 border-b border-white/10 bg-slate-950/50">
-                        <CardTitle className="text-sm font-medium text-slate-400 flex items-center gap-2">
-                            <AlertTriangle className="h-4 w-4 text-red-400" /> Fraud Analysis
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="flex-1 overflow-y-auto p-0">
-                        <div className="p-6 space-y-6">
-
-                            {/* Alert Card 1 */}
-                            <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/20">
-                                <div className="flex items-start gap-3">
-                                    <AlertTriangle className="h-5 w-5 text-red-400 mt-0.5" />
-                                    <div>
-                                        <h4 className="font-semibold text-red-400 text-sm">Suspicious Detention Charge</h4>
-                                        <p className="text-slate-300 text-sm mt-1">
-                                            The invoice includes detention charges for 5 days ($1,200), but AIS tracking shows the container was returned within the free time period (2 days).
-                                        </p>
-                                        <div className="mt-3 bg-slate-950 rounded p-2 text-xs font-mono text-slate-400 border border-white/5">
-                                            Evidence: AIS Position Log #99238 vs Invoice Line #4
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Alert Card 2 */}
-                            <div className="p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-                                <div className="flex items-start gap-3">
-                                    <AlertTriangle className="h-5 w-5 text-yellow-400 mt-0.5" />
-                                    <div>
-                                        <h4 className="font-semibold text-yellow-400 text-sm">Rate Discrepancy</h4>
-                                        <p className="text-slate-300 text-sm mt-1">
-                                            Ocean Freight rate ($4,500) is 12% higher than the agreed contract rate ($4,000).
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Extracted Data Summary */}
-                            <div className="pt-4 border-t border-white/10">
-                                <h4 className="font-medium text-white mb-3 text-sm">Extracted Line Items</h4>
-                                <div className="space-y-2">
-                                    {[
-                                        { desc: "Ocean Freight", amount: "$4,500.00", status: "warning" },
-                                        { desc: "THC Origin", amount: "$250.00", status: "ok" },
-                                        { desc: "THC Dest", amount: "$250.00", status: "ok" },
-                                        { desc: "Detention Charge", amount: "$1,200.00", status: "error" },
-                                        { desc: "Doc Fee", amount: "$50.00", status: "ok" },
-                                    ].map((item, i) => (
-                                        <div key={i} className="flex justify-between text-sm p-2 rounded hover:bg-white/5">
-                                            <span className="text-slate-400">{item.desc}</span>
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-white font-mono">{item.amount}</span>
-                                                {item.status === 'error' && <div className="h-2 w-2 rounded-full bg-red-500" />}
-                                                {item.status === 'warning' && <div className="h-2 w-2 rounded-full bg-yellow-500" />}
-                                                {item.status === 'ok' && <div className="h-2 w-2 rounded-full bg-green-500 opacity-50" />}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-
+                <div className="rounded-xl border border-white/10 bg-slate-900/50 p-5">
+                    <div className="text-xs text-slate-500 uppercase tracking-wide mb-2">Audit Pipeline</div>
+                    <div className="space-y-3 text-sm">
+                        <div className="flex items-center gap-2 text-slate-300">
+                            <Clock className="h-4 w-4 text-violet-300" />
+                            <span>Invoice ingested and stored</span>
                         </div>
-                    </CardContent>
-                </Card>
+                        <div className="flex items-center gap-2 text-slate-300">
+                            <Shield className="h-4 w-4 text-cyan-300" />
+                            <span>OCR + verification stage</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-slate-300">
+                            <AlertTriangle className="h-4 w-4 text-orange-300" />
+                            <span>Dispute recommendation stage</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="rounded-xl border border-white/10 bg-slate-900/50 p-5">
+                    <div className="text-xs text-slate-500 uppercase tracking-wide mb-2">File Metadata</div>
+                    <div className="space-y-2 text-sm">
+                        <div className="flex justify-between gap-3">
+                            <span className="text-slate-400">Stored File</span>
+                            <span className="text-white text-right break-all">{invoice.fileName || "Uploaded invoice"}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span className="text-slate-400">Fraud Score</span>
+                            <span className="text-white">{invoice.fraudScore}%</span>
+                        </div>
+                    </div>
+                </div>
             </div>
+
+            {error && <div className="rounded-md border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">{error}</div>}
+
+            <GenerateDisputeModal
+                isOpen={isDisputeOpen}
+                onClose={() => setIsDisputeOpen(false)}
+                onGenerate={() => setIsDisputeOpen(false)}
+            />
         </div>
     )
 }

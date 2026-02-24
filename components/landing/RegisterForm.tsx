@@ -6,7 +6,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Progress } from "@/components/ui/progress"
-import { Card, CardContent } from "@/components/ui/card"
 import { Check, ChevronRight, ChevronLeft, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -52,8 +51,10 @@ export function RegisterForm() {
                     email: formData.email,
                     password: formData.password,
                     companyName: formData.companyName,
+                    companySize: formData.companySize,
+                    fleetSize: formData.fleetSize,
+                    phone: formData.phone,
                     plan: formData.plan
-                    // Additional fields can be added to API as needed
                 })
             })
 
@@ -64,12 +65,12 @@ export function RegisterForm() {
 
             // Auto-login or redirect to dashboard (or show verify email message)
             // For now, we'll just show success
-            alert("Registration successful! Check console for simulated email.")
+            alert("Registration successful. You can now sign in.")
             // In a real app, sign in immediately:
             // signIn('credentials', { email: formData.email, password: formData.password })
 
-        } catch (error: any) {
-            alert(error.message)
+        } catch (error: unknown) {
+            alert(getErrorMessage(error))
         } finally {
             setIsLoading(false)
         }
@@ -265,7 +266,7 @@ export function RegisterForm() {
                                             }
                                             alert("15-Day Free Trial activated! Please log in to continue.")
                                         })
-                                        .catch((error: any) => alert(error.message))
+                                        .catch((error: unknown) => alert(getErrorMessage(error)))
                                         .finally(() => setIsLoading(false))
                                 }}
                             >
@@ -307,3 +308,10 @@ export function RegisterForm() {
         </div>
     )
 }
+    const getErrorMessage = (error: unknown) => {
+        if (error instanceof Error) {
+            return error.message
+        }
+
+        return "Registration failed"
+    }

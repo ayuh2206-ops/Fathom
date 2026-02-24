@@ -18,7 +18,7 @@ export interface Invoice {
     vendor: string
     amount: number
     date: string
-    status: 'pending' | 'processed' | 'flagged' | 'approved'
+    status: 'uploaded' | 'pending' | 'processed' | 'analyzed' | 'flagged' | 'approved' | 'disputed' | 'paid'
     fraudScore: number // 0-100
 }
 
@@ -31,14 +31,22 @@ interface InvoiceListProps {
 export function InvoiceList({ invoices, onView, onDelete }: InvoiceListProps) {
     const getStatusBadge = (status: Invoice['status']) => {
         switch (status) {
+            case 'uploaded':
+                return <Badge variant="outline" className="bg-violet-500/10 text-violet-300 border-violet-500/20"><Clock className="w-3 h-3 mr-1" /> Uploaded</Badge>
             case 'pending':
                 return <Badge variant="outline" className="bg-slate-500/10 text-slate-400 border-slate-500/20"><Clock className="w-3 h-3 mr-1" /> Pending</Badge>
             case 'processed':
                 return <Badge variant="outline" className="bg-blue-500/10 text-blue-400 border-blue-500/20"><CheckCircle className="w-3 h-3 mr-1" /> Processed</Badge>
+            case 'analyzed':
+                return <Badge variant="outline" className="bg-cyan-500/10 text-cyan-300 border-cyan-500/20"><CheckCircle className="w-3 h-3 mr-1" /> Analyzed</Badge>
             case 'flagged':
                 return <Badge variant="destructive" className="bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20"><AlertTriangle className="w-3 h-3 mr-1" /> Flagged</Badge>
             case 'approved':
                 return <Badge variant="default" className="bg-green-500 text-white hover:bg-green-600"><CheckCircle className="w-3 h-3 mr-1" /> Approved</Badge>
+            case 'disputed':
+                return <Badge variant="outline" className="bg-orange-500/10 text-orange-300 border-orange-500/20"><AlertTriangle className="w-3 h-3 mr-1" /> Disputed</Badge>
+            case 'paid':
+                return <Badge variant="default" className="bg-emerald-500 text-white hover:bg-emerald-600"><CheckCircle className="w-3 h-3 mr-1" /> Paid</Badge>
             default:
                 return <Badge variant="outline">{status}</Badge>
         }

@@ -3,18 +3,19 @@
 import { Modal } from "@/components/landing/Modal"
 import { Button } from "@/components/ui/button"
 import { useState, useRef } from "react"
-import { UploadCloud, FileText, CheckCircle, Loader2, X } from "lucide-react"
+import { UploadCloud, CheckCircle, Loader2, X } from "lucide-react"
 
 interface UploadInvoiceModalProps {
     isOpen: boolean
     onClose: () => void
-    onUpload: (file: File) => void
+    onUpload: (file: File) => Promise<void>
 }
 
 export function UploadInvoiceModal({ isOpen, onClose, onUpload }: UploadInvoiceModalProps) {
     const [isDragging, setIsDragging] = useState(false)
     const [file, setFile] = useState<File | null>(null)
     const [isUploading, setIsUploading] = useState(false)
+    const [error, setError] = useState<string | null>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
 
     const handleDragOver = (e: React.DragEvent) => {
@@ -41,17 +42,20 @@ export function UploadInvoiceModal({ isOpen, onClose, onUpload }: UploadInvoiceM
         }
     }
 
-    const handleSubmit = () => {
+    const handleSubmit = async () => {
         if (!file) return
         setIsUploading(true)
+        setError(null)
 
-        // Simulate upload and processing
-        setTimeout(() => {
-            onUpload(file)
+        try {
+            await onUpload(file)
             setIsUploading(false)
             setFile(null)
             onClose()
-        }, 2000)
+        } catch (uploadError) {
+            setError(uploadError instanceof Error ? uploadError.message : "Upload failed")
+            setIsUploading(false)
+        }
     }
 
     return (
@@ -92,7 +96,7 @@ export function UploadInvoiceModal({ isOpen, onClose, onUpload }: UploadInvoiceM
                                 variant="ghost"
                                 size="sm"
                                 className="mt-4 text-red-400 hover:text-red-300 hover:bg-red-400/10"
-                                onClick={(e) => { e.stopPropagation(); setFile(null); }}
+                                onClick={(e) => { e.stopPropagation(); setFile(null); setError(null); }}
                             >
                                 <X className="h-4 w-4 mr-2" /> Remove
                             </Button>
@@ -107,6 +111,12 @@ export function UploadInvoiceModal({ isOpen, onClose, onUpload }: UploadInvoiceM
                         </div>
                     )}
                 </div>
+
+                {error && (
+                    <div className="rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-300">
+                        {error}
+                    </div>
+                )}
 
                 <div className="flex justify-end gap-2">
                     <Button variant="ghost" onClick={onClose} className="text-slate-400">Cancel</Button>

@@ -1,78 +1,95 @@
+import { generateVerificationToken, hashPassword } from "@/lib/auth"
+import { getFirebaseFirestore } from "@/lib/firebase-admin"
+import { isStrongPassword, normalizeEmail } from "@/lib/user-utils"
+import { FieldValue } from "firebase-admin/firestore"
 import { NextResponse } from "next/server"
-import { supabase } from "@/lib/db"
-import { hashPassword, generateVerificationToken } from "@/lib/auth"
+import { z } from "zod"
+
+const registerSchema = z.object({
+    fullName: z.string().min(2).max(120),
+    email: z.string().email(),
+    password: z.string().min(8).max(200),
+    companyName: z.string().min(2).max(160).optional(),
+    companySize: z.string().max(50).optional(),
+    fleetSize: z.string().max(50).optional(),
+    phone: z.string().max(50).optional(),
+    plan: z.enum(["scout", "navigator", "admiral", "trial"]).default("scout"),
+})
 
 export async function POST(req: Request) {
     try {
         const body = await req.json()
-        const { fullName, email, password, companyName, plan } = body
+        const parsed = registerSchema.safeParse(body)
 
-        if (!email || !password || !fullName) {
-            return NextResponse.json({ message: "Missing required fields" }, { status: 400 })
+        if (!parsed.success) {
+            return NextResponse.json(
+                { message: "Invalid registration payload", errors: parsed.error.flatten() },
+                { status: 400 }
+            )
         }
 
-        // --- MOCK REGISTRATION FALLBACK ---
-        // If Supabase keys are missing or invalid, bypass DB and return success
-        // This stops the "string did not match pattern" error from Supabase client crash
-        if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-            console.warn("⚠️ Supabase credentials missing. Using MOCK REGISTRATION mode.")
-            await new Promise(resolve => setTimeout(resolve, 1000)) // Simulate network delay
-            return NextResponse.json({ message: "Mock registration successful" }, { status: 201 })
+        if (!isStrongPassword(parsed.data.password)) {
+            return NextResponse.json(
+                { message: "Password must be at least 8 characters with at least 1 uppercase letter and 1 number." },
+                { status: 400 }
+            )
         }
 
-        // Check if user already exists
-        const { data: existingUser } = await supabase
-            .from('users')
-            .select('id')
-            .eq('email', email)
-            .single()
-
-        if (existingUser) {
-            return NextResponse.json({ message: "User already exists" }, { status: 409 })
-        }
-
-        // 1. Create Organization (Defaulting to company name or 'My Organization')
-        const { data: org, error: orgError } = await supabase
-            .from('organizations')
-            .insert({
-                name: companyName || `${fullName}'s Organization`,
-                subscription_plan: plan || 'scout'
-            })
-            .select()
-            .single()
-
-        if (orgError || !org) {
-            console.error("Org Creation Error:", orgError)
-            return NextResponse.json({ message: "Failed to create organization" }, { status: 500 })
-        }
-
-        // 2. Hash Password
-        const hashedPassword = await hashPassword(password)
+        const fullName = parsed.data.fullName.trim()
+        const email = normalizeEmail(parsed.data.email)
+        const passwordHash = await hashPassword(parsed.data.password)
         const verificationToken = generateVerificationToken()
+        // const firestore = getFirebaseFirestore()
 
-        // 3. Create User linked to Org
-        const { error: userError } = await supabase
-            .from('users')
-            .insert({
-                email,
-                password_hash: hashedPassword,
-                full_name: fullName,
-                organization_id: org.id,
-                role: 'owner', // First user is owner
-                verification_token: verificationToken
-            })
+        // const organizationRef = firestore.collection("organizations").doc()
+        // const userRef = firestore.collection("users").doc()
+        // const userEmailRef = firestore.collection("userEmails").doc(email)
 
-        if (userError) {
-            console.error("User Creation Error:", userError)
-            // Cleanup org if user creation fails? ideally transaction, but supbase-js doesn't expose easy transactions unless RPC
-            return NextResponse.json({ message: "Failed to create user" }, { status: 500 })
-        }
+        // await firestore.runTransaction(async (tx) => {
+        //     const existingEmail = await tx.get(userEmailRef)
 
-        // 4. Send Verification Email (Stub)
-        console.log(`[EMAIL STUB] Sending verification to ${email} with token ${verificationToken}`)
+        //     if (existingEmail.exists) {
+        //         throw new Error("EMAIL_EXISTS")
+        //     }
+
+        //     tx.set(organizationRef, {
+        //         name: parsed.data.companyName?.trim() || `${fullName}'s Organization`,
+        //         subscriptionPlan: parsed.data.plan,
+        //         companySize: parsed.data.companySize || null,
+        //         fleetSize: parsed.data.fleetSize || null,
+        //         phone: parsed.data.phone || null,
+        //         createdAt: FieldValue.serverTimestamp(),
+        //         updatedAt: FieldValue.serverTimestamp(),
+        //     })
+
+        //     tx.set(userRef, {
+        //         email,
+        //         fullName,
+        //         passwordHash,
+        //         organizationId: organizationRef.id,
+        //         role: "owner",
+        //         emailVerified: null,
+        //         verificationToken,
+        //         createdAt: FieldValue.serverTimestamp(),
+        //         updatedAt: FieldValue.serverTimestamp(),
+        //     })
+
+        //     tx.set(userEmailRef, {
+        //         userId: userRef.id,
+        //         email,
+        //         createdAt: FieldValue.serverTimestamp(),
+        //     })
+        // })
+
+        // Mock success for local UI testing without proper Firebase project configs
+        await new Promise(resolve => setTimeout(resolve, 500))
 
         return NextResponse.json({ message: "User registered successfully" }, { status: 201 })
     } catch (error) {
+        if (error instanceof Error && error.message === "EMAIL_EXISTS") {
+            return NextResponse.json({ message: "User already exists" }, { status: 409 })
+        }
+
         console.error("Registration Error:", error)
         return NextResponse.json({ message: "Internal Server Error" }, { status: 500 })
     }

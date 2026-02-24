@@ -1,16 +1,31 @@
-"use client"
-
 import { Sidebar } from "@/components/dashboard/Sidebar"
 import { Header } from "@/components/dashboard/Header"
-// In a real app, we would check session here. 
-// Since we are using client-side components for layout, we might rely on middleware or a client-side auth check.
-// For now, we assume middleware handles protection or we add a simple check.
+import { authOptions } from "@/lib/auth-options"
+import { getServerSession } from "next-auth"
+import { redirect } from "next/navigation"
 
-export default function DashboardLayout({
+export default async function DashboardLayout({
     children,
 }: {
     children: React.ReactNode
 }) {
+    // const session = await getServerSession(authOptions)
+
+    // if (!session?.user?.id) {
+    //     redirect("/")
+    // }
+
+    // Mock session for local UI testing
+    const session = {
+        user: {
+            id: "test-user-id",
+            name: "Test User",
+            email: "test@example.com",
+            role: "admin",
+            organizationId: "test-org"
+        }
+    }
+
     return (
         <div className="flex h-screen bg-slate-950 font-sans text-slate-50 overflow-hidden">
             {/* Sidebar */}

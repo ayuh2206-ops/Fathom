@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Cinzel, JetBrains_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/toaster";
+import { AuthProvider } from "@/components/providers/AuthProvider";
 import "./globals.css";
 
 const inter = Inter({
@@ -33,7 +34,7 @@ export default function RootLayout({
       <body
         className={`${inter.variable} ${cinzel.variable} ${jetbrainsMono.variable} font-sans antialiased`}
       >
-        {children}
+        <AuthProvider>{children}</AuthProvider>
         <Toaster />
       </body>
     </html>

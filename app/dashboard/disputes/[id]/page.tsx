@@ -8,7 +8,48 @@ import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import Link from "next/link"
 
-const DISPUTES: Record<string, any> = {
+interface DisputeMessage {
+    direction: string;
+    date: string;
+    to?: string;
+    subject: string;
+    body: string;
+    attachments?: string[];
+    readAt?: string;
+}
+
+interface DisputeTimelineEvent {
+    date: string;
+    action: string;
+    type: string;
+}
+
+interface AgentProfile {
+    name: string;
+    riskScore: number;
+    totalDisputes: number;
+    winRate: number;
+    openDisputes: number;
+}
+
+interface DisputeDetail {
+    id: string;
+    invoiceNumber: string;
+    type: string;
+    amount: number;
+    carrier: string;
+    carrierEmail: string;
+    status: string;
+    date: string;
+    vessel: string;
+    port: string;
+    evidence: string[];
+    timeline: DisputeTimelineEvent[];
+    messages: DisputeMessage[];
+    agentProfile: AgentProfile;
+}
+
+const DISPUTES: Record<string, DisputeDetail> = {
     "DSP-992": {
         id: "DSP-992",
         invoiceNumber: "INV-2023-899",
@@ -179,7 +220,7 @@ export default function DisputeDetailPage() {
                                 </div>
                             )}
 
-                            {dispute.messages.map((msg: any, i: number) => (
+                            {dispute.messages.map((msg, i: number) => (
                                 <div key={i} className={`p-5 ${msg.direction === "sent" ? "border-l-4 border-l-sky-500/60" : "border-l-4 border-l-green-500/60"}`}>
                                     <div className="flex items-start justify-between mb-3">
                                         <div>
@@ -210,7 +251,7 @@ export default function DisputeDetailPage() {
                                         {expandedMsg === i ? "Collapse letter ▲" : "Expand full letter ▼"}
                                     </button>
 
-                                    {msg.attachments?.length > 0 && (
+                                    {msg.attachments && msg.attachments.length > 0 && (
                                         <div className="flex flex-wrap gap-2 mt-3">
                                             {msg.attachments.map((att: string) => (
                                                 <div key={att} className="flex items-center gap-1.5 rounded-md bg-slate-800 border border-white/10 px-2.5 py-1.5 text-xs text-slate-300 hover:border-sky-500/40 cursor-pointer">
@@ -276,7 +317,7 @@ export default function DisputeDetailPage() {
                             <Clock className="h-4 w-4 text-sky-400" /> Timeline
                         </h3>
                         <div className="relative pl-4 border-l border-white/10 space-y-4">
-                            {dispute.timeline.map((event: any, i: number) => (
+                            {dispute.timeline.map((event, i: number) => (
                                 <div key={i} className="relative">
                                     <div className={`absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-slate-950 ${event.type === "fathom" ? "bg-sky-500" : "bg-green-500"}`} />
                                     <p className="text-xs text-slate-600">{event.date}</p>

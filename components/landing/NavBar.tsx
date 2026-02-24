@@ -5,7 +5,6 @@ import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Anchor, Menu, X } from "lucide-react"
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet" // Need to install sheet later if not present, but for now assuming we might use a simple mobile menu or install sheet. Actually, I didn't install sheet... I'll implement a custom one or just standard conditional rendering for now to avoid extra installs if possible, OR I should install sheet. The list had dialog/dropdown, let's stick to standard div for mobile menu for speed/simplicity or use what we have.
 // Let's use a custom mobile menu state for now to match the prompt requirements without extra deps if possible, or just standard state.
 
 interface NavBarProps {

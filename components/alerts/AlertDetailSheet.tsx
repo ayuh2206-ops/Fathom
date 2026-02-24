@@ -10,7 +10,7 @@ import {
     SheetTitle,
     SheetFooter
 } from "@/components/ui/sheet"
-import { AlertTriangle, ShieldCheck, Ship, FileText, Activity } from "lucide-react"
+import { ShieldCheck, Ship, FileText } from "lucide-react"
 
 interface Alert {
     id: string

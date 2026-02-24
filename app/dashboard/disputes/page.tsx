@@ -20,7 +20,7 @@ export default function DisputesPage() {
     const [disputes, setDisputes] = useState<Dispute[]>(INITIAL_DISPUTES)
     const [isModalOpen, setIsModalOpen] = useState(false)
 
-    const handleGenerate = (data: any) => {
+    const handleGenerate = (data: { invoiceNumber: string; type: string; amount: number; date: string }) => {
         const newDispute: Dispute = {
             id: `DSP-${Math.floor(Math.random() * 1000)}`,
             invoiceNumber: data.invoiceNumber,

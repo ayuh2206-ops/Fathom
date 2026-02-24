@@ -12,7 +12,7 @@ import { Gavel, Loader2 } from "lucide-react"
 interface GenerateDisputeModalProps {
     isOpen: boolean
     onClose: () => void
-    onGenerate: (disputeData: any) => void
+    onGenerate: (disputeData: { invoiceNumber: string; type: string; amount: number; date: string; details?: string }) => void
 }
 
 export function GenerateDisputeModal({ isOpen, onClose, onGenerate }: GenerateDisputeModalProps) {

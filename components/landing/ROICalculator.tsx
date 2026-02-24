@@ -4,7 +4,7 @@ import * as React from "react"
 import { Slider } from "@/components/ui/slider"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { ArrowRight, DollarSign } from "lucide-react"
+import { ArrowRight } from "lucide-react"
 
 export function ROICalculator() {
     const [volume, setVolume] = React.useState([10000])

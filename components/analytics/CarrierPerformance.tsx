@@ -1,8 +1,6 @@
 "use client"
 
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer, PolarRadiusAxis } from "recharts"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-
 const data = [
     { subject: 'On-Time Arrival', A: 90, B: 65, fullMark: 100 },
     { subject: 'Doc Accuracy', A: 85, B: 50, fullMark: 100 },
@@ -67,7 +65,7 @@ export function CarrierPerformance() {
                 </div>
                 <div className="p-3 bg-white/5 rounded-md border border-white/5 mt-4">
                     <p className="text-xs text-slate-400 italic">
-                        "Maersk Line shows significantly better detention performance this quarter. CMA CGM recurring issues with doc delays are impacting free time usage."
+                        &quot;Maersk Line shows significantly better detention performance this quarter. CMA CGM recurring issues with doc delays are impacting free time usage.&quot;
                     </p>
                 </div>
             </div>

@@ -14,8 +14,21 @@ const FleetMap = dynamic(() => import('@/components/fleet/FleetMap'), {
     loading: () => <div className="h-[600px] w-full bg-slate-900 animate-pulse rounded-lg flex items-center justify-center text-slate-500">Loading Map...</div>
 })
 
+export interface FleetVessel {
+    id: string;
+    name: string;
+    imo: string;
+    lat: number;
+    lng: number;
+    heading: number;
+    speed: number;
+    status: 'moving' | 'anchored' | 'moored';
+    nextPort: string;
+    eta: string;
+}
+
 // MOCK DATA
-const INITIAL_VESSELS = [
+const INITIAL_VESSELS: FleetVessel[] = [
     { id: '1', name: 'EVER GIVEN', imo: '9811000', lat: 30.01, lng: 32.55, heading: 45, speed: 12.0, status: 'moving', nextPort: 'Rotterdam', eta: '2024-02-15 14:00' },
     { id: '2', name: 'MAERSK ALABAMA', imo: '9164263', lat: 25.10, lng: -55.20, heading: 270, speed: 16.5, status: 'moving', nextPort: 'Charleston', eta: '2024-02-12 09:30' },
     { id: '3', name: 'HMM ALGECIRAS', imo: '9863297', lat: 1.25, lng: 103.80, heading: 0, speed: 0, status: 'moored', nextPort: 'Singapore', eta: 'Arrived' },
@@ -23,7 +36,7 @@ const INITIAL_VESSELS = [
 ]
 
 export default function FleetPage() {
-    const [vessels, setVessels] = useState<any[]>(INITIAL_VESSELS)
+    const [vessels, setVessels] = useState<FleetVessel[]>(INITIAL_VESSELS)
     const [view, setView] = useState("map")
     const [isAddModalOpen, setIsAddModalOpen] = useState(false)
 

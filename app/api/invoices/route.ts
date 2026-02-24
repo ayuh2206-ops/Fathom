@@ -1,7 +1,5 @@
-import { authOptions } from "@/lib/auth-options"
 import { getFirebaseFirestore, getFirebaseStorage } from "@/lib/firebase-admin"
 import { FieldValue, Timestamp } from "firebase-admin/firestore"
-import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import path from "path"
 

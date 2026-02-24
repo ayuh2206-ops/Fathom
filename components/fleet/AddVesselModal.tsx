@@ -6,12 +6,10 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useState } from "react"
-import { Ship } from "lucide-react"
-
 interface AddVesselModalProps {
     isOpen: boolean
     onClose: () => void
-    onAdd: (vessel: any) => void
+    onAdd: (vessel: { id: string; name: string; imo: string; type: string; lat: number; lng: number; heading: number; speed: number; status: 'moving' | 'anchored' | 'moored'; nextPort: string; eta: string }) => void
 }
 
 export function AddVesselModal({ isOpen, onClose, onAdd }: AddVesselModalProps) {
@@ -34,7 +32,7 @@ export function AddVesselModal({ isOpen, onClose, onAdd }: AddVesselModalProps) 
                 lng: -30 + Math.random() * 60,
                 heading: Math.floor(Math.random() * 360),
                 speed: 14.5,
-                status: 'moving',
+                status: 'moving' as const,
                 nextPort: 'Rotterdam',
                 eta: '2024-02-15 08:00'
             }

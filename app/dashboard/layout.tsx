@@ -1,9 +1,5 @@
 import { Sidebar } from "@/components/dashboard/Sidebar"
 import { Header } from "@/components/dashboard/Header"
-import { authOptions } from "@/lib/auth-options"
-import { getServerSession } from "next-auth"
-import { redirect } from "next/navigation"
-
 export default async function DashboardLayout({
     children,
 }: {
@@ -16,15 +12,15 @@ export default async function DashboardLayout({
     // }
 
     // Mock session for local UI testing
-    const session = {
-        user: {
-            id: "test-user-id",
-            name: "Test User",
-            email: "test@example.com",
-            role: "admin",
-            organizationId: "test-org"
-        }
-    }
+    // const session = {
+    //     user: {
+    //         id: "test-user-id",
+    //         name: "Test User",
+    //         email: "test@example.com",
+    //         role: "admin",
+    //         organizationId: "test-org"
+    //     }
+    // }
 
     return (
         <div className="flex h-screen bg-slate-950 font-sans text-slate-50 overflow-hidden">

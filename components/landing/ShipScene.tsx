@@ -65,7 +65,7 @@ function Containers() {
     return (
         <group>
             {containers.map((c, i) => (
-                <mesh key={i} position={c.position as any} castShadow>
+                <mesh key={i} position={c.position as [number, number, number]} castShadow>
                     <boxGeometry args={[1, 1, 2]} />
                     <meshStandardMaterial color={c.color} roughness={0.5} />
                 </mesh>

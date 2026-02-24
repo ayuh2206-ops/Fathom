@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { MoreHorizontal, ArrowUpRight } from "lucide-react"
+import { ArrowUpRight } from "lucide-react"
 
 interface Vessel {
     id: string

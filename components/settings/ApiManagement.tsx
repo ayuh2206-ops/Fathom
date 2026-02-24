@@ -3,13 +3,12 @@
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Copy, Plus, Trash2, Eye, EyeOff } from "lucide-react"
+import { Copy, Plus, Trash2 } from "lucide-react"
 import { useState } from "react"
 
 export function ApiManagement() {
-    const [isVisible, setIsVisible] = useState(false)
-    const [keys, setKeys] = useState([
+    const [isVisible] = useState(false)
+    const [keys] = useState([
         { id: '1', name: 'Production Key', prefix: 'pk_live_', val: '89s8d9...s89d', created: '2023-11-01', lastUsed: 'Just now' },
         { id: '2', name: 'Test Key', prefix: 'pk_test_', val: 'j23k4j...23k4j', created: '2023-11-01', lastUsed: '2 days ago' },
     ])

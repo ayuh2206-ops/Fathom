@@ -327,7 +327,7 @@ export const ProtocolAnimation = ({ onStepClick }: { onStepClick: (step: any) =>
     );
 };
 
-export const NavBar = ({ scrollY, onLogin, onScrollTo }: { scrollY: number, onLogin: () => void, onScrollTo: (id: string) => void }) => {
+export const NavBar = ({ scrollY, onLogin, onScrollTo, onAdminAccess }: { scrollY: number, onLogin: () => void, onScrollTo: (id: string) => void, onAdminAccess: () => void }) => {
     const isScrolled = scrollY > 50;
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -337,9 +337,7 @@ export const NavBar = ({ scrollY, onLogin, onScrollTo }: { scrollY: number, onLo
                 <div
                     className="flex items-center gap-2 cursor-pointer group select-none"
                     onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-                    onDoubleClick={() => {
-                        window.location.href = '/admin';
-                    }}
+                    onDoubleClick={onAdminAccess}
                 >
                     <span className="text-2xl transform group-hover:scale-110 group-hover:rotate-12 transition-transform duration-300">⚓</span>
                     <span className="cinzel font-bold text-2xl text-white tracking-widest group-hover:text-blue-400 transition-colors">FATHOM</span>
@@ -377,10 +375,73 @@ export const NavBar = ({ scrollY, onLogin, onScrollTo }: { scrollY: number, onLo
     );
 };
 
+export const AdminAuthForm = ({ onClose }: { onClose: () => void }) => {
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState('');
+
+    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        setError('');
+        setIsLoading(true);
+
+        const form = e.currentTarget;
+        const name = (form.elements.namedItem('name') as HTMLInputElement).value;
+        const password = (form.elements.namedItem('password') as HTMLInputElement).value;
+
+        try {
+            const response = await fetch("/api/admin/login", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name, password }),
+            });
+
+            if (!response.ok) {
+                setError("Invalid admin credentials.");
+                setIsLoading(false);
+                return;
+            }
+
+            window.location.href = "/admin";
+        } catch {
+            setError("Unable to login right now. Try again.");
+            setIsLoading(false);
+        }
+    };
+
+    return (
+        <form onSubmit={handleSubmit} className="space-y-4">
+            <label className="block text-xs uppercase tracking-widest text-blue-300">Name</label>
+            <input name="name" required type="text" autoComplete="username" className="w-full bg-slate-800 border border-white/10 rounded px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors" />
+
+            <label className="block text-xs uppercase tracking-widest text-blue-300 mt-4">Password</label>
+            <input name="password" required type="password" autoComplete="current-password" className="w-full bg-slate-800 border border-white/10 rounded px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors" />
+
+            {error && <p className="text-red-400 text-sm mt-2">{error}</p>}
+
+            <div className="flex gap-4 mt-6">
+                <button type="button" onClick={onClose} className="flex-1 py-3 border border-white/20 hover:bg-white/10 text-white font-bold rounded-full transition-colors backdrop-blur-sm">
+                    Cancel
+                </button>
+                <button type="submit" disabled={isLoading} className="flex-1 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-full transition-colors shadow-lg shadow-blue-500/20 backdrop-blur-sm">
+                    {isLoading ? "CHECKING..." : "LOGIN"}
+                </button>
+            </div>
+        </form>
+    );
+};
+
 export default function LandingUI() {
     const router = useRouter();
     const [scrollY, setScrollY] = useState(0);
     const [modalState, setModalState] = useState<{ isOpen: boolean, type: string | null, data: any }>({ isOpen: false, type: null, data: null });
+
+    const openModal = React.useCallback((type: string, data: any = null) => {
+        if (type === 'signup') {
+            router.push('/register');
+            return;
+        }
+        setModalState({ isOpen: true, type, data });
+    }, [router]);
 
     useEffect(() => {
         if (window.location.search.includes('login=true')) {
@@ -391,7 +452,7 @@ export default function LandingUI() {
             if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key.toLowerCase() === 'k' || e.code === 'KeyK')) {
                 e.preventDefault();
                 e.stopPropagation();
-                router.push('/admin');
+                openModal('admin');
             }
         };
         window.addEventListener('keydown', handleKeyDown, { capture: true });
@@ -403,15 +464,8 @@ export default function LandingUI() {
             window.removeEventListener('scroll', handleScroll);
             window.removeEventListener('keydown', handleKeyDown, { capture: true });
         }
-    }, [router]);
+    }, [router, openModal]);
 
-    const openModal = (type: string, data: any = null) => {
-        if (type === 'signup') {
-            router.push('/register');
-            return;
-        }
-        setModalState({ isOpen: true, type, data });
-    };
     const closeModal = () => setModalState({ isOpen: false, type: null, data: null });
 
     const scrollToSection = (id: string) => {
@@ -443,6 +497,7 @@ export default function LandingUI() {
                     <p className="text-xs text-slate-500">Timezone: UTC-08:00 (Pacific Time)</p>
                 </div>
             );
+            case 'admin': return <AdminAuthForm onClose={closeModal} />;
             case 'enterprise': return (
                 <div className="space-y-4">
                     <p className="text-slate-300 text-sm mb-4">Please detail your fleet requirements for a custom quote.</p>
@@ -466,6 +521,7 @@ export default function LandingUI() {
             case 'signup': return 'Create Your Account';
             case 'video': return 'Fathom Platform Demo';
             case 'calendar': return 'Schedule a Discovery Call';
+            case 'admin': return 'Internal Admin Access';
             case 'enterprise': return 'Enterprise Solution Inquiry';
             case 'protocol': return modalState.data?.title || 'System Protocol';
             default: return '';
@@ -474,7 +530,7 @@ export default function LandingUI() {
 
     return (
         <div id="root-container" className="relative w-full z-10">
-            <NavBar scrollY={scrollY} onLogin={() => openModal('login')} onScrollTo={scrollToSection} />
+            <NavBar scrollY={scrollY} onLogin={() => openModal('login')} onAdminAccess={() => openModal('admin')} onScrollTo={scrollToSection} />
 
             <Modal isOpen={modalState.isOpen} onClose={closeModal} title={getModalTitle()}>
                 {renderModalContent()}

@@ -1,102 +1,179 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
- 
+
 @layer base {
   :root {
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
- 
+
     --card: 0 0% 100%;
     --card-foreground: 222.2 84% 4.9%;
- 
+
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
- 
+
     --primary: 221.2 83.2% 53.3%;
     --primary-foreground: 210 40% 98%;
- 
+
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
- 
+
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
- 
+
     --accent: 210 40% 96.1%;
     --accent-foreground: 222.2 47.4% 11.2%;
- 
+
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
- 
+
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
     --ring: 221.2 83.2% 53.3%;
- 
+
     --radius: 0.5rem;
   }
- 
+
   .dark {
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
- 
+
     --card: 222.2 84% 4.9%;
     --card-foreground: 210 40% 98%;
- 
+
     --popover: 222.2 84% 4.9%;
     --popover-foreground: 210 40% 98%;
- 
+
     --primary: 217.2 91.2% 59.8%;
     --primary-foreground: 222.2 47.4% 11.2%;
- 
+
     --secondary: 217.2 32.6% 17.5%;
     --secondary-foreground: 210 40% 98%;
- 
+
     --muted: 217.2 32.6% 17.5%;
     --muted-foreground: 215 20.2% 65.1%;
- 
+
     --accent: 217.2 32.6% 17.5%;
     --accent-foreground: 210 40% 98%;
- 
+
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
- 
+
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 224.3 76.3% 48%;
   }
 }
- 
+
 @layer base {
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
   }
 }
 
-@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400..900&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;700&display=swap');
+::-webkit-scrollbar {
+  width: 8px;
+}
 
-::-webkit-scrollbar { width: 8px; }
-::-webkit-scrollbar-track { background: #020617; }
-::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: #3b82f6; }
+::-webkit-scrollbar-track {
+  background: #020617;
+}
 
-.cinzel { font-family: 'Cinzel', serif; }
-.mono { font-family: 'JetBrains Mono', monospace; }
+::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 4px;
+}
 
-.vignette { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; background: radial-gradient(circle at center, transparent 30%, rgba(2,6,23,0.95) 100%); z-index: 5; }
-.letterbox { position: fixed; left: 0; width: 100vw; height: 10vh; background: black; z-index: 6; pointer-events: none; box-shadow: 0 0 50px rgba(0,0,0,1); }
-.lb-top { top: 0; }
-.lb-bottom { bottom: 0; }
+::-webkit-scrollbar-thumb:hover {
+  background: #3b82f6;
+}
 
-@keyframes scroll { 0% { transform: translateX(0); } 100% { transform: translateX(calc(-50% - 2rem)); } }
-@keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(200%); } }
-@keyframes progress { 0% { width: 0%; } 100% { width: 100%; } }
-@keyframes scan { 0% { transform: translateY(-100%); } 100% { transform: translateY(200%); } }
-@keyframes scale { 0% { transform: scale(0.95); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
-@keyframes slideDown { 0% { transform: translateY(-10px); opacity: 0; } 100% { transform: translateY(0); opacity: 1; } }
 
-.animate-scroll { animation: scroll 30s linear infinite; }
-.animate-scan { animation: scan 3s linear infinite; }
-.accent-ocean { accent-color: #3b82f6; }
+.vignette {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  background: radial-gradient(circle at center, transparent 30%, rgba(2, 6, 23, 0.95) 100%);
+  z-index: 5;
+}
+
+.letterbox {
+  position: fixed;
+  left: 0;
+  width: 100vw;
+  height: 10vh;
+  background: black;
+  z-index: 6;
+  pointer-events: none;
+  box-shadow: 0 0 50px rgba(0, 0, 0, 1);
+}
+
+.lb-top {
+  top: 0;
+}
+
+.lb-bottom {
+  bottom: 0;
+}
+
+
+@keyframes progress {
+  0% {
+    width: 0%;
+  }
+
+  100% {
+    width: 100%;
+  }
+}
+
+@keyframes scan {
+  0% {
+    transform: translateY(-100%);
+  }
+
+  100% {
+    transform: translateY(200%);
+  }
+}
+
+@keyframes scale {
+  0% {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes slideDown {
+  0% {
+    transform: translateY(-10px);
+    opacity: 0;
+  }
+
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+
+.animate-scan {
+  animation: scan 3s linear infinite;
+}
+
+.accent-ocean {
+  accent-color: #3b82f6;
+}

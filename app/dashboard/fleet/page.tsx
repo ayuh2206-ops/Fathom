@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react"
 import dynamic from 'next/dynamic'
+import { collection, onSnapshot } from "firebase/firestore"
+import { db, hasClientConfig } from "@/lib/firebase"
 import { FleetList } from "@/components/fleet/FleetList"
 import { AddVesselModal } from "@/components/fleet/AddVesselModal"
 import { Button } from "@/components/ui/button"
@@ -27,37 +29,48 @@ export interface FleetVessel {
     eta: string;
 }
 
-// MOCK DATA
-const INITIAL_VESSELS: FleetVessel[] = [
-    { id: '1', name: 'EVER GIVEN', imo: '9811000', lat: 30.01, lng: 32.55, heading: 45, speed: 12.0, status: 'moving', nextPort: 'Rotterdam', eta: '2024-02-15 14:00' },
-    { id: '2', name: 'MAERSK ALABAMA', imo: '9164263', lat: 25.10, lng: -55.20, heading: 270, speed: 16.5, status: 'moving', nextPort: 'Charleston', eta: '2024-02-12 09:30' },
-    { id: '3', name: 'HMM ALGECIRAS', imo: '9863297', lat: 1.25, lng: 103.80, heading: 0, speed: 0, status: 'moored', nextPort: 'Singapore', eta: 'Arrived' },
-    { id: '4', name: 'CMA CGM MARCO POLO', imo: '9454436', lat: 45.45, lng: -73.35, heading: 92, speed: 0.5, status: 'anchored', nextPort: 'Montreal', eta: '2024-02-10 18:00' },
-]
+// No longer need hardcoded mock data here, we will fetch it!
 
 export default function FleetPage() {
-    const [vessels, setVessels] = useState<FleetVessel[]>(INITIAL_VESSELS)
+    const [vessels, setVessels] = useState<FleetVessel[]>([])
     const [view, setView] = useState("map")
     const [isAddModalOpen, setIsAddModalOpen] = useState(false)
 
-    // Simulation loop
+    // Simulation loop fetching from our Mock API OR Firestore Sync
     useEffect(() => {
-        const interval = setInterval(() => {
-            setVessels(current => current.map(v => {
-                if (v.status === 'moving') {
-                    return {
-                        ...v,
-                        lat: v.lat + (Math.random() - 0.5) * 0.05,
-                        lng: v.lng + (Math.random() - 0.5) * 0.05,
-                        speed: Math.max(0, Math.min(25, v.speed + (Math.random() - 0.5))),
-                        heading: (v.heading + (Math.random() - 0.5) * 5) % 360
-                    }
-                }
-                return v
-            }))
-        }, 2000) // Update every 2 seconds
+        if (hasClientConfig && db) {
+            // PHASE 3: REAL-TIME FIRESTORE SYNC
+            // Listen to the 'vessels' collection for instant updates pushed by the Cloud Function
+            const unsubscribe = onSnapshot(collection(db, "vessels"), (snapshot) => {
+                const liveVessels: FleetVessel[] = [];
+                snapshot.forEach((doc) => {
+                    liveVessels.push({ id: doc.id, ...doc.data() } as FleetVessel);
+                });
+                setVessels(liveVessels);
+            }, (error) => {
+                console.error("Firestore onSnapshot error:", error);
+            });
 
-        return () => clearInterval(interval)
+            return () => unsubscribe();
+        } else {
+            // FALLBACK: If Firebase Client SDK isn't configured, fallback to polling the Mock API
+            const fetchFleet = async () => {
+                try {
+                    const res = await fetch('/api/mock/fleet')
+                    if (res.ok) {
+                        const data = await res.json()
+                        setVessels(data.vessels)
+                    }
+                } catch (error) {
+                    console.error("Failed to fetch mock fleet:", error)
+                }
+            }
+
+            fetchFleet() // initial fetch
+            const interval = setInterval(fetchFleet, 2000) // Update every 2 seconds from the server
+
+            return () => clearInterval(interval)
+        }
     }, [])
 
     return (
@@ -105,7 +118,27 @@ export default function FleetPage() {
             <AddVesselModal
                 isOpen={isAddModalOpen}
                 onClose={() => setIsAddModalOpen(false)}
-                onAdd={(vessel) => setVessels([...vessels, vessel])}
+                onAdd={async (vessel) => {
+                    if (hasClientConfig && db) {
+                        try {
+                            const { doc, setDoc } = await import("firebase/firestore");
+                            await setDoc(doc(db, "vessels", vessel.id), vessel);
+                        } catch (e) {
+                            console.error("Failed to add ship to live Firestore map", e);
+                        }
+                    } else {
+                        try {
+                            await fetch('/api/mock/fleet', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(vessel)
+                            });
+                            // The 2-second poller will automatically grab the new ship
+                        } catch (e) {
+                            console.error("Failed to add ship to mock simulation", e);
+                        }
+                    }
+                }}
             />
         </div>
     )

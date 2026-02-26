@@ -26,24 +26,29 @@ export function StatCard({ title, value, description, icon: Icon, trend }: StatC
             <CardContent>
                 <div className="text-2xl font-bold text-white">{value}</div>
                 {(trend || description) && (
-                    <div className="flex items-center mt-1">
+                    <div className="flex flex-col mt-1 space-y-1">
                         {trend && (
-                            <span
-                                className={cn(
-                                    "text-xs font-medium flex items-center mr-2",
-                                    trend.direction === "up" ? "text-green-400" :
-                                        trend.direction === "down" ? "text-red-400" : "text-slate-400"
-                                )}
-                            >
-                                {trend.direction === "up" && <ArrowUp className="h-3 w-3 mr-1" />}
-                                {trend.direction === "down" && <ArrowDown className="h-3 w-3 mr-1" />}
-                                {trend.direction === "neutral" && <Minus className="h-3 w-3 mr-1" />}
-                                {trend.value}%
-                            </span>
+                            <div className="flex items-center">
+                                <span
+                                    className={cn(
+                                        "text-xs font-medium flex items-center mr-2",
+                                        trend.direction === "up" ? "text-green-400" :
+                                            trend.direction === "down" ? "text-red-400" : "text-slate-400"
+                                    )}
+                                >
+                                    {trend.direction === "up" && <ArrowUp className="h-3 w-3 mr-1" />}
+                                    {trend.direction === "down" && <ArrowDown className="h-3 w-3 mr-1" />}
+                                    {trend.direction === "neutral" && <Minus className="h-3 w-3 mr-1" />}
+                                    {trend.value}%
+                                </span>
+                                <span className="text-xs text-slate-500">{trend.label}</span>
+                            </div>
                         )}
-                        <p className="text-xs text-slate-500">
-                            {trend ? trend.label : description}
-                        </p>
+                        {description && (
+                            <p className="text-xs text-slate-500">
+                                {description}
+                            </p>
+                        )}
                     </div>
                 )}
             </CardContent>

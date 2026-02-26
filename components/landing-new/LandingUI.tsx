@@ -86,7 +86,7 @@ export const LogoMarquee = () => {
             <div id="logos" className="w-full bg-slate-900/50 backdrop-blur-sm border-y border-white/5 py-12 overflow-hidden relative group">
                 <div className="flex animate-scroll whitespace-nowrap gap-16 md:gap-32 w-max group-hover:[animation-play-state:paused]">
                     {[...logos, ...logos].map((logo, i) => (
-                        <span key={i} className="cinzel text-2xl md:text-3xl font-bold text-white/20 hover:text-white transition-colors duration-300 cursor-default select-none">
+                        <span key={i} className="font-serif text-2xl md:text-3xl font-bold text-white/20 hover:text-white transition-colors duration-300 cursor-default select-none">
                             {logo}
                         </span>
                     ))}
@@ -103,7 +103,7 @@ export const Modal = ({ isOpen, onClose, children, title, maxWidth = "max-w-xl" 
             <div className="absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity" onClick={onClose}></div>
             <div className={`relative w-full ${maxWidth} bg-slate-900 border border-white/10 rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.8)] overflow-hidden animate-[scale_0.2s_ease-out]`}>
                 <div className="flex items-center justify-between p-6 border-b border-white/5 bg-slate-800/50">
-                    <h3 className="cinzel text-xl font-bold text-white">{title}</h3>
+                    <h3 className="font-serif text-xl font-bold text-white">{title}</h3>
                     <a href="#" onClick={(e) => { e.preventDefault(); onClose(); }} className="text-slate-400 hover:text-white transition-colors block p-1" aria-label="Close modal">
                         <Icons.X />
                     </a>
@@ -213,10 +213,10 @@ export const ROICalculator = ({ onRecover }: { onRecover: (data: any) => void })
     return (
         <div className="bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-xl p-8 shadow-2xl overflow-hidden relative group">
             <div className="flex justify-between items-center mb-6">
-                <h3 className="cinzel text-xl text-white font-bold">ROI Estimator</h3>
+                <h3 className="font-serif text-xl text-white font-bold">ROI Estimator</h3>
                 <div className="flex items-center gap-2 text-green-400">
                     <Icons.TrendingUp />
-                    <span className="mono text-xs font-bold">LIVE CALC</span>
+                    <span className="font-mono text-xs font-bold">LIVE CALC</span>
                 </div>
             </div>
 
@@ -224,21 +224,21 @@ export const ROICalculator = ({ onRecover }: { onRecover: (data: any) => void })
                 <div>
                     <div className="flex justify-between text-sm text-slate-400 mb-2">
                         <span>Annual Shipment Volume</span>
-                        <span className="text-white mono">{volume.toLocaleString()} TEU</span>
+                        <span className="text-white font-mono">{volume.toLocaleString()} TEU</span>
                     </div>
                     <input type="range" min="1000" max="50000" step="100" value={volume} onChange={(e) => setVolume(Number(e.target.value))} className="w-full accent-ocean h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer" />
                 </div>
                 <div>
                     <div className="flex justify-between text-sm text-slate-400 mb-2">
                         <span>Avg. Cost per Container</span>
-                        <span className="text-white mono">${cost.toLocaleString()}</span>
+                        <span className="text-white font-mono">${cost.toLocaleString()}</span>
                     </div>
                     <input type="range" min="500" max="10000" step="100" value={cost} onChange={(e) => setCost(Number(e.target.value))} className="w-full accent-ocean h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer" />
                 </div>
                 <div>
                     <div className="flex justify-between text-sm text-slate-400 mb-2">
                         <span>Industry Avg. Error Rate</span>
-                        <span className="text-white mono">{errorRate}%</span>
+                        <span className="text-white font-mono">{errorRate}%</span>
                     </div>
                     <input type="range" min="1" max="10" step="0.5" value={errorRate} onChange={(e) => setErrorRate(Number(e.target.value))} className="w-full accent-ocean h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer" />
                 </div>
@@ -246,7 +246,7 @@ export const ROICalculator = ({ onRecover }: { onRecover: (data: any) => void })
 
             <div className="border-t border-white/10 pt-6">
                 <div className="text-slate-400 text-sm mb-1">Estimated Recoverable Revenue</div>
-                <div className="text-3xl md:text-5xl font-bold text-white font-mono drop-shadow-[0_0_15px_rgba(74,222,128,0.2)] break-words mb-6">
+                <div className="text-3xl md:text-5xl font-bold text-white font-font-mono drop-shadow-[0_0_15px_rgba(74,222,128,0.2)] break-words mb-6">
                     <AnimatedCounter end={potentialLoss} prefix="$" duration={500} />
                 </div>
                 <button
@@ -305,17 +305,17 @@ export const ProtocolAnimation = ({ onStepClick }: { onStepClick: (step: any) =>
                     const isActive = i === activeStep;
                     return (
                         <div key={i} onClick={() => onStepClick(item)} className={`relative group cursor-pointer transition-all duration-500 ${isActive ? 'scale-105' : 'opacity-50 hover:opacity-100 scale-100'}`}>
-                            <div className="absolute -top-12 -right-4 text-9xl font-bold text-white/5 font-mono select-none pointer-events-none">{item.id}</div>
+                            <div className="absolute -top-12 -right-4 text-9xl font-bold text-white/5 font-font-mono select-none pointer-events-none">{item.id}</div>
                             <div className={`h-full p-8 rounded-xl border backdrop-blur-md transition-all duration-500 flex flex-col items-start relative overflow-hidden ${isActive ? 'bg-slate-900/80 border-blue-500/50 shadow-[0_0_50px_rgba(59,130,246,0.2)]' : 'bg-slate-900/20 border-white/5 group-hover:bg-slate-800/50'}`}>
                                 {isActive && <div className="absolute bottom-0 left-0 h-1 bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,1)] animate-[progress_4s_linear_forward]" style={{ width: '100%' }}></div>}
                                 <div className="flex items-center gap-3 mb-6 w-full">
                                     <div className={`w-12 h-12 rounded flex items-center justify-center border transition-all duration-500 ${isActive ? 'bg-blue-500/10 border-blue-400 text-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.3)]' : 'bg-slate-800 border-white/10 text-slate-500'}`}>{item.icon}</div>
-                                    <div className="font-mono text-[10px] tracking-widest text-blue-300">
+                                    <div className="font-font-mono text-[10px] tracking-widest text-blue-300">
                                         {isActive ? <span className="flex items-center gap-2"><span className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse"></span>{item.status}</span> : <span className="text-slate-600">STANDBY</span>}
                                     </div>
                                 </div>
-                                <h3 className={`text-xl font-bold mb-3 cinzel transition-colors ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-white'}`}>{item.title}</h3>
-                                <p className={`text-sm leading-relaxed font-mono transition-colors ${isActive ? 'text-blue-100' : 'text-slate-500'}`}>{item.desc}</p>
+                                <h3 className={`text-xl font-bold mb-3 font-serif transition-colors ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-white'}`}>{item.title}</h3>
+                                <p className={`text-sm leading-relaxed font-font-mono transition-colors ${isActive ? 'text-blue-100' : 'text-slate-500'}`}>{item.desc}</p>
                                 {isActive && <div className="absolute inset-0 bg-gradient-to-b from-transparent via-blue-400/5 to-transparent h-[50%] w-full animate-scan pointer-events-none"></div>}
                             </div>
                             <div className={`hidden md:block absolute -top-[3.25rem] left-1/2 -translate-x-1/2 w-4 h-4 rounded-full border-2 z-20 transition-all duration-500 ${isActive ? 'bg-blue-500 border-blue-400 shadow-[0_0_15px_rgba(59,130,246,1)]' : 'bg-slate-900 border-slate-700'}`}></div>
@@ -340,7 +340,7 @@ export const NavBar = ({ scrollY, onLogin, onScrollTo, onAdminAccess }: { scroll
                     onDoubleClick={onAdminAccess}
                 >
                     <span className="text-2xl transform group-hover:scale-110 group-hover:rotate-12 transition-transform duration-300">⚓</span>
-                    <span className="cinzel font-bold text-2xl text-white tracking-widest group-hover:text-blue-400 transition-colors">FATHOM</span>
+                    <span className="font-serif font-bold text-2xl text-white tracking-widest group-hover:text-blue-400 transition-colors">FATHOM</span>
                 </div>
 
                 {/* Desktop Nav */}
@@ -543,7 +543,7 @@ export default function LandingUI() {
             {/* SECTION 1: HERO */}
             <div className="h-[100vh] relative flex items-center justify-center pointer-events-none">
                 <div className="text-center transition-opacity duration-300 pointer-events-auto" style={{ opacity: Math.max(0, 1 - scrollY / 600) }}>
-                    <h1 className="cinzel text-8xl md:text-9xl font-bold text-transparent bg-clip-text bg-gradient-to-b from-white via-blue-100 to-blue-400 tracking-tighter drop-shadow-[0_10px_20px_rgba(0,0,0,0.9)] mb-8">
+                    <h1 className="font-serif text-8xl md:text-9xl font-bold text-transparent bg-clip-text bg-gradient-to-b from-white via-blue-100 to-blue-400 tracking-tighter drop-shadow-[0_10px_20px_rgba(0,0,0,0.9)] mb-8">
                         FATHOM
                     </h1>
                     <div className="flex flex-col md:flex-row gap-4 justify-center items-center">
@@ -577,7 +577,7 @@ export default function LandingUI() {
                     ].map((stat, i) => (
                         <FadeIn key={i} delay={i * 150} direction="up" className="h-full">
                             <div className="bg-white/5 border border-white/10 p-8 rounded-xl backdrop-blur-md text-center group hover:bg-white/10 transition-all h-full flex flex-col justify-center overflow-hidden">
-                                <div className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mono mb-2 group-hover:text-blue-400 transition-colors break-words">
+                                <div className="text-3xl md:text-4xl lg:text-5xl font-bold text-white font-mono mb-2 group-hover:text-blue-400 transition-colors break-words">
                                     <AnimatedCounter end={stat.val} prefix={stat.prefix} suffix={stat.suffix} />
                                 </div>
                                 <div className="text-slate-400 tracking-widest text-xs font-bold uppercase">{stat.label}</div>
@@ -592,8 +592,8 @@ export default function LandingUI() {
                 <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
                     <FadeIn direction="left">
                         <div>
-                            <div className="mono text-orange-500 text-xs font-bold tracking-widest mb-4">/// SYSTEM ALERT</div>
-                            <h2 className="cinzel text-4xl md:text-5xl font-bold text-white mb-6 leading-tight">
+                            <div className="font-mono text-orange-500 text-xs font-bold tracking-widest mb-4">/// SYSTEM ALERT</div>
+                            <h2 className="font-serif text-4xl md:text-5xl font-bold text-white mb-6 leading-tight">
                                 The Ocean is Deep.<br />Your Losses Shouldn&apos;t Be.
                             </h2>
                             <p className="text-slate-300 text-lg leading-relaxed mb-8 border-l-2 border-orange-500 pl-6">
@@ -608,10 +608,10 @@ export default function LandingUI() {
                                     </div>
                                 </div>
                                 <div className="space-y-3 text-sm group-hover:opacity-80 transition-opacity">
-                                    <div className="flex justify-between"><span className="text-gray-500">Container ID</span><span className="font-mono">MSCU99214</span></div>
+                                    <div className="flex justify-between"><span className="text-gray-500">Container ID</span><span className="font-font-mono">MSCU99214</span></div>
                                     <div className="flex justify-between bg-blue-50 p-2 rounded -mx-2">
                                         <span className="text-blue-600 font-bold flex gap-2 items-center"><Icons.Globe width={16} /> AIS Actual</span>
-                                        <span className="font-mono text-blue-800">Oct 14, 09:30</span>
+                                        <span className="font-font-mono text-blue-800">Oct 14, 09:30</span>
                                     </div>
                                     <div className="pt-2 text-right text-red-600 font-bold text-xs">DISCREPANCY: 43.5 HOURS</div>
                                 </div>
@@ -636,7 +636,7 @@ export default function LandingUI() {
                 <div className="max-w-7xl mx-auto relative z-10">
                     <FadeIn direction="up">
                         <div className="text-center mb-20">
-                            <h2 className="cinzel text-4xl text-white font-bold mb-4 drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]">The Fathom Protocol</h2>
+                            <h2 className="font-serif text-4xl text-white font-bold mb-4 drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]">The Fathom Protocol</h2>
                             <div className="w-24 h-1 bg-gradient-to-r from-transparent via-blue-500 to-transparent mx-auto"></div>
                         </div>
                     </FadeIn>
@@ -651,7 +651,7 @@ export default function LandingUI() {
                     <FadeIn>
                         <div className="flex items-center gap-4 mb-16 justify-center">
                             <div className="h-px w-12 bg-slate-800"></div>
-                            <h2 className="cinzel text-3xl text-center text-white tracking-widest">INTERCEPTED COMMS</h2>
+                            <h2 className="font-serif text-3xl text-center text-white tracking-widest">INTERCEPTED COMMS</h2>
                             <div className="h-px w-12 bg-slate-800"></div>
                         </div>
                     </FadeIn>
@@ -667,15 +667,15 @@ export default function LandingUI() {
                                     <div className="absolute bottom-0 right-0 w-3 h-3 border-r-2 border-b-2 border-slate-600 group-hover:border-blue-400 transition-colors duration-300"></div>
                                     <div className="flex justify-between items-start mb-6 border-b border-white/5 pb-4">
                                         <div>
-                                            <div className="mono text-[10px] text-blue-400 tracking-widest opacity-70 mb-1">ID: {t.id}</div>
-                                            <div className="flex items-center gap-2 bg-green-900/20 px-2 py-1 rounded border border-green-500/20"><div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse shadow-[0_0_5px_rgba(74,222,128,0.5)]"></div><span className="mono text-[10px] text-green-400 tracking-wider font-bold">{t.status}</span></div>
+                                            <div className="font-mono text-[10px] text-blue-400 tracking-widest opacity-70 mb-1">ID: {t.id}</div>
+                                            <div className="flex items-center gap-2 bg-green-900/20 px-2 py-1 rounded border border-green-500/20"><div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse shadow-[0_0_5px_rgba(74,222,128,0.5)]"></div><span className="font-mono text-[10px] text-green-400 tracking-wider font-bold">{t.status}</span></div>
                                         </div>
                                         <div className="text-white/10 transform scale-150 group-hover:text-blue-500/20 transition-colors duration-500"><Icons.Quote /></div>
                                     </div>
                                     <div className="mb-8 relative z-10 flex-1"><p className="text-slate-300 text-lg font-light leading-relaxed italic">&quot;{t.msg}&quot;</p></div>
                                     <div className="mt-auto flex items-center gap-4">
                                         <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-slate-800 flex items-center justify-center text-sm font-bold text-white border border-white/10 rounded shadow-lg group-hover:scale-110 transition-transform duration-300">{t.name.charAt(0)}</div>
-                                        <div><div className="text-white font-bold text-sm cinzel tracking-wide group-hover:text-blue-300 transition-colors">{t.name}</div><div className="text-slate-500 text-[10px] uppercase tracking-widest">{t.role}</div></div>
+                                        <div><div className="text-white font-bold text-sm font-serif tracking-wide group-hover:text-blue-300 transition-colors">{t.name}</div><div className="text-slate-500 text-[10px] uppercase tracking-widest">{t.role}</div></div>
                                     </div>
                                 </div>
                             </FadeIn>
@@ -688,12 +688,12 @@ export default function LandingUI() {
             <div id="pricing" className="py-24 px-8 bg-gradient-to-b from-slate-900 to-slate-950 border-t border-white/5 relative">
                 <div className="max-w-7xl mx-auto z-10 relative">
                     <FadeIn>
-                        <h2 className="cinzel text-4xl text-center mb-16 text-transparent bg-clip-text bg-gradient-to-b from-white via-blue-100 to-blue-400 drop-shadow-[0_0_15px_rgba(59,130,246,0.5)]">Deployment Tiers</h2>
+                        <h2 className="font-serif text-4xl text-center mb-16 text-transparent bg-clip-text bg-gradient-to-b from-white via-blue-100 to-blue-400 drop-shadow-[0_0_15px_rgba(59,130,246,0.5)]">Deployment Tiers</h2>
                     </FadeIn>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-center">
                         <FadeIn delay={0} direction="right" className="h-full">
                             <div className="p-8 border border-blue-500/20 rounded-xl bg-slate-900/60 backdrop-blur-xl h-full flex flex-col hover:border-blue-400/50 transition-all hover:shadow-[0_0_30px_rgba(59,130,246,0.1)] group">
-                                <h3 className="cinzel text-xl text-blue-200 mb-2 group-hover:text-white transition-colors">Scout</h3>
+                                <h3 className="font-serif text-xl text-blue-200 mb-2 group-hover:text-white transition-colors">Scout</h3>
                                 <div className="text-4xl font-bold mb-6 text-transparent bg-clip-text bg-gradient-to-b from-white via-blue-100 to-blue-400">$499<span className="text-sm font-normal text-slate-500">/mo</span></div>
                                 <ul className="space-y-4 mb-8 text-slate-400 text-sm flex-1">
                                     <li className="flex gap-2"><Icons.Check width={16} className="text-blue-400" /> Up to 1,000 Containers</li>
@@ -707,7 +707,7 @@ export default function LandingUI() {
                         <FadeIn delay={200} direction="up" className="h-full relative z-10">
                             <div className="p-8 border-2 border-blue-400 rounded-xl bg-slate-900/80 backdrop-blur-xl relative transform md:scale-105 shadow-[0_0_50px_rgba(59,130,246,0.2)] h-full flex flex-col">
                                 <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-blue-500 text-white px-4 py-1 text-xs font-bold rounded-full tracking-wider shadow-[0_0_15px_rgba(59,130,246,0.6)]">POPULAR</div>
-                                <h3 className="cinzel text-xl text-white mb-2">Navigator</h3>
+                                <h3 className="font-serif text-xl text-white mb-2">Navigator</h3>
                                 <div className="text-5xl font-bold mb-6 text-transparent bg-clip-text bg-gradient-to-b from-white via-blue-100 to-blue-400 drop-shadow-[0_0_10px_rgba(59,130,246,0.5)]">$1,499<span className="text-sm font-normal text-slate-500">/mo</span></div>
                                 <ul className="space-y-4 mb-8 text-slate-300 text-sm flex-1">
                                     <li className="flex gap-2"><Icons.Check width={16} className="text-blue-400" /> Up to 10,000 Containers</li>
@@ -720,7 +720,7 @@ export default function LandingUI() {
 
                         <FadeIn delay={400} direction="left" className="h-full">
                             <div className="p-8 border border-blue-500/20 rounded-xl bg-slate-900/60 backdrop-blur-xl h-full flex flex-col hover:border-blue-400/50 transition-all hover:shadow-[0_0_30px_rgba(59,130,246,0.1)] group">
-                                <h3 className="cinzel text-xl text-blue-200 mb-2 group-hover:text-white transition-colors">Admiral</h3>
+                                <h3 className="font-serif text-xl text-blue-200 mb-2 group-hover:text-white transition-colors">Admiral</h3>
                                 <div className="text-4xl font-bold mb-6 text-transparent bg-clip-text bg-gradient-to-b from-white via-blue-100 to-blue-400">Custom</div>
                                 <ul className="space-y-4 mb-8 text-slate-400 text-sm flex-1">
                                     <li className="flex gap-2"><Icons.Check width={16} className="text-blue-400" /> Unlimited Volume</li>
@@ -740,7 +740,7 @@ export default function LandingUI() {
                 <div className="absolute inset-0 shadow-[inset_0_0_150px_rgba(2,6,23,0.9)] pointer-events-none z-10"></div>
                 <div className="relative z-20 max-w-4xl mx-auto">
                     <FadeIn direction="up">
-                        <h2 className="cinzel text-5xl md:text-6xl text-white font-bold mb-8 drop-shadow-[0_10px_10px_rgba(0,0,0,0.8)]">Stop Leaking Revenue Today.</h2>
+                        <h2 className="font-serif text-5xl md:text-6xl text-white font-bold mb-8 drop-shadow-[0_10px_10px_rgba(0,0,0,0.8)]">Stop Leaking Revenue Today.</h2>
                         <p className="text-xl text-blue-200 mb-12 drop-shadow-lg">Join 500+ forwarders who have recovered millions with Fathom&apos;s intelligence engine.</p>
                         <div className="flex flex-col md:flex-row gap-6 justify-center">
                             <button onClick={() => openModal('signup')} className="px-10 py-5 rounded-full bg-white/90 backdrop-blur-md border border-white/50 text-blue-900 font-bold text-lg hover:bg-white hover:scale-105 transition-all shadow-[0_0_30px_rgba(255,255,255,0.3)]">
@@ -759,7 +759,7 @@ export default function LandingUI() {
                 <FadeIn delay={200}>
                     <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-12">
                         <div>
-                            <div className="text-white cinzel font-bold text-2xl flex items-center gap-2 mb-6 cursor-pointer" onClick={() => scrollToSection('root-container')}>
+                            <div className="text-white font-serif font-bold text-2xl flex items-center gap-2 mb-6 cursor-pointer" onClick={() => scrollToSection('root-container')}>
                                 <span className="text-ocean-light">⚓</span> FATHOM
                             </div>
                             <p className="mb-6">Maritime intelligence for the modern supply chain.</p>
@@ -792,7 +792,7 @@ export default function LandingUI() {
                                 <li><button className="hover:text-white transition-colors">Terms of Service</button></li>
                                 <li><button className="hover:text-white transition-colors">Cookie Settings</button></li>
                             </ul>
-                            <div className="mt-6 mono text-xs text-slate-600">
+                            <div className="mt-6 font-mono text-xs text-slate-600">
                                 © 2024 FATHOM INC.<br />SAN FRANCISCO, CA
                             </div>
                         </div>

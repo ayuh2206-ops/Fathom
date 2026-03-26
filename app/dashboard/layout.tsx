@@ -3,6 +3,8 @@ import { Sidebar } from "@/components/dashboard/Sidebar"
 import { authOptions } from "@/lib/auth-options"
 import { getServerSession } from "next-auth"
 import { redirect } from "next/navigation"
+import { verifyAdminSessionToken, ADMIN_SESSION_COOKIE } from "@/lib/admin-auth"
+import { cookies } from "next/headers"
 
 export default async function DashboardLayout({
     children,
@@ -10,10 +12,17 @@ export default async function DashboardLayout({
     children: React.ReactNode
 }) {
     const session = await getServerSession(authOptions)
+    
+    // Check for admin session fallback for testing/access
+    const adminToken = cookies().get(ADMIN_SESSION_COOKIE)?.value
+    const isAdmin = verifyAdminSessionToken(adminToken)
 
-    if (!session?.user?.id) {
+    if (!session?.user?.id && !isAdmin) {
         redirect("/")
     }
+
+    const userName = session?.user?.name || "Admin (Testing)"
+    const userEmail = session?.user?.email || "admin@fathom"
 
     return (
         <div className="flex h-screen bg-slate-950 font-sans text-slate-50 overflow-hidden">
@@ -22,7 +31,7 @@ export default async function DashboardLayout({
             </div>
 
             <div className="flex-1 flex flex-col h-full overflow-hidden relative">
-                <Header userName={session.user.name} userEmail={session.user.email} />
+                <Header userName={userName} userEmail={userEmail} />
 
                 <main className="flex-1 overflow-y-auto bg-slate-950/50 p-6 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
                     <div className="max-w-7xl mx-auto w-full">

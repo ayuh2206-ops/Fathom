@@ -133,6 +133,10 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
         const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET })
 
         if (!token) {
+            const validAdminSession = await hasValidAdminSession(request)
+            if (validAdminSession) {
+                return NextResponse.next()
+            }
             return redirectToHome(request, "authRequired")
         }
 

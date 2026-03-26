@@ -15,9 +15,9 @@ function getRequiredEnv(name: "ADMIN_USERNAME" | "ADMIN_PASSWORD" | "ADMIN_PANEL
     return value
 }
 
-const ADMIN_USERNAME = getRequiredEnv("ADMIN_USERNAME")
-const ADMIN_PASSWORD = getRequiredEnv("ADMIN_PASSWORD")
-const ADMIN_PANEL_SECRET = getRequiredEnv("ADMIN_PANEL_SECRET")
+function getAdminUsername(): string { return getRequiredEnv("ADMIN_USERNAME") }
+function getAdminPassword(): string { return getRequiredEnv("ADMIN_PASSWORD") }
+function getAdminSecret(): string { return getRequiredEnv("ADMIN_PANEL_SECRET") }
 
 function safeEqual(a: string, b: string): boolean {
     const aBuffer = Buffer.from(a, "utf8")
@@ -31,7 +31,7 @@ function safeEqual(a: string, b: string): boolean {
 }
 
 function signPayload(payload: string): string {
-    return createHmac("sha256", ADMIN_PANEL_SECRET).update(payload).digest("base64url")
+    return createHmac("sha256", getAdminSecret()).update(payload).digest("base64url")
 }
 
 /**
@@ -39,7 +39,7 @@ function signPayload(payload: string): string {
  * Rotate these credentials and `ADMIN_PANEL_SECRET` before any production deployment.
  */
 export function verifyAdminCredentials(name: string, password: string): boolean {
-    return safeEqual(name, ADMIN_USERNAME) && safeEqual(password, ADMIN_PASSWORD)
+    return safeEqual(name, getAdminUsername()) && safeEqual(password, getAdminPassword())
 }
 
 export function createAdminSessionToken(username: string): string {
@@ -83,7 +83,7 @@ export function verifyAdminSessionToken(token?: string | null): boolean {
             return false
         }
 
-        if (payload.sub !== ADMIN_USERNAME) {
+        if (payload.sub !== getAdminUsername()) {
             return false
         }
 

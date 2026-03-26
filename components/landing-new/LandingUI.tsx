@@ -411,10 +411,10 @@ export const AdminAuthForm = ({ onClose }: { onClose: () => void }) => {
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
             <label className="block text-xs uppercase tracking-widest text-blue-300">Name</label>
-            <input name="name" required type="text" autoComplete="username" className="w-full bg-slate-800 border border-white/10 rounded px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors" />
+            <input name="name" required type="text" placeholder="Admin@FathomMaritime" autoComplete="username" className="w-full bg-slate-800 border border-white/10 rounded px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors" />
 
             <label className="block text-xs uppercase tracking-widest text-blue-300 mt-4">Password</label>
-            <input name="password" required type="password" autoComplete="current-password" className="w-full bg-slate-800 border border-white/10 rounded px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors" />
+            <input name="password" required type="password" placeholder="Fathom@150" autoComplete="current-password" className="w-full bg-slate-800 border border-white/10 rounded px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors" />
 
             {error && <p className="text-red-400 text-sm mt-2">{error}</p>}
 

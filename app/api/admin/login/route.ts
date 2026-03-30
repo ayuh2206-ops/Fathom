@@ -6,6 +6,7 @@ import {
 } from "@/lib/admin-auth"
 import { NextResponse } from "next/server"
 import { z } from "zod"
+import { getClientIp, rateLimit } from "@/lib/rate-limit"
 
 export const runtime = "nodejs"
 
@@ -16,6 +17,16 @@ const adminLoginSchema = z.object({
 
 export async function POST(request: Request) {
     try {
+        const clientIp = getClientIp(request)
+        const isAllowed = rateLimit(`admin-login:${clientIp}`, 5, 15 * 60 * 1000)
+
+        if (!isAllowed) {
+            return NextResponse.json(
+                { error: "Too many requests. Please try again later." },
+                { status: 429 }
+            )
+        }
+
         const body = await request.json()
         const parsed = adminLoginSchema.safeParse(body)
 

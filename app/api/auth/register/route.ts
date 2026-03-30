@@ -4,6 +4,8 @@ import { isStrongPassword, normalizeEmail } from "@/lib/user-utils"
 import { FieldValue } from "firebase-admin/firestore"
 import { NextResponse } from "next/server"
 import { z } from "zod"
+import { sendWelcomeEmail } from "@/lib/email/sendgrid"
+import { getClientIp, rateLimit } from "@/lib/rate-limit"
 
 const registerSchema = z.object({
     fullName: z.string().min(2).max(120),
@@ -18,6 +20,16 @@ const registerSchema = z.object({
 
 export async function POST(req: Request) {
     try {
+        const clientIp = getClientIp(req)
+        const isAllowed = rateLimit(`register:${clientIp}`, 5, 60 * 60 * 1000)
+
+        if (!isAllowed) {
+            return NextResponse.json(
+                { error: "Too many requests. Please try again later." },
+                { status: 429 }
+            )
+        }
+
         const body = await req.json()
         const parsed = registerSchema.safeParse(body)
 
@@ -80,6 +92,10 @@ export async function POST(req: Request) {
                 createdAt: FieldValue.serverTimestamp(),
             })
         })
+
+        // Fire and forget welcome email
+        const orgName = parsed.data.companyName?.trim() || `${fullName}'s Organization`
+        void sendWelcomeEmail(email, fullName, orgName).catch(console.error)
 
         return NextResponse.json({ message: "User registered successfully" }, { status: 201 })
     } catch (error) {

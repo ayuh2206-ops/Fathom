@@ -11,6 +11,8 @@ import { admin, getFirebaseFirestore, getFirebaseStorage } from "@/lib/firebase-
 import { Timestamp } from "firebase-admin/firestore"
 import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
+import { sendInvoiceAnalysisComplete } from "@/lib/email/sendgrid"
+import { rateLimit } from "@/lib/rate-limit"
 
 export const runtime = "nodejs"
 
@@ -247,6 +249,14 @@ export async function POST(_: Request, { params }: { params: { id: string } }) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const isAllowed = rateLimit(`invoice-analyze:${session.user.organizationId}`, 10, 60 * 60 * 1000)
+    if (!isAllowed) {
+        return NextResponse.json(
+            { error: "Too many requests. Please try again later." },
+            { status: 429 }
+        )
+    }
+
     const firestore = getFirebaseFirestore()
     const invoiceRef = firestore.collection("invoices").doc(params.id)
     const invoiceDoc = await invoiceRef.get()
@@ -320,6 +330,17 @@ export async function POST(_: Request, { params }: { params: { id: string } }) {
 
         const updatedDoc = await invoiceRef.get()
         const signedFileUrl = await getSignedFileUrl(invoiceData.filePath)
+
+        if (session.user.email) {
+            const invoiceNumberStr = String(invoiceData.invoiceNumber || `INV-${invoiceDoc.id.slice(0, 8)}`)
+            void sendInvoiceAnalysisComplete(
+                session.user.email,
+                invoiceNumberStr,
+                fraudResult.fraudScore,
+                fraudResult.riskLevel,
+                `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/dashboard/invoices/${invoiceDoc.id}`
+            ).catch(console.error)
+        }
 
         return NextResponse.json({ invoice: serializeInvoice(updatedDoc, signedFileUrl) }, { status: 200 })
     } catch (error: unknown) {

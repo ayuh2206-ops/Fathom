@@ -1,86 +1,391 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __exportStar = (this && this.__exportStar) || function(m, exports) {
+    for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ingestFleetData = void 0;
 const scheduler_1 = require("firebase-functions/v2/scheduler");
 const admin = require("firebase-admin");
 const turf = require("@turf/turf");
-admin.initializeApp();
+__exportStar(require("./vesselSync"), exports);
+if (!admin.apps.length) {
+    admin.initializeApp();
+}
 const db = admin.firestore();
+const HOURS_TO_MS = 60 * 60 * 1000;
+const ALERT_DEDUP_WINDOW_HOURS = 6;
+const ALERT_DEDUP_WINDOW_MS = ALERT_DEDUP_WINDOW_HOURS * HOURS_TO_MS;
+const MAX_BATCH_OPERATIONS = 400;
+const STOPPED_VESSEL_THRESHOLD_KNOTS = 0.5;
+const STOPPED_VESSEL_DEDUP_SCOPE = "vessel_stopped";
+const PORT_LIKE_STATUSES = new Set([
+    "anchored",
+    "at_anchor",
+    "berthed",
+    "docked",
+    "in_port",
+    "moored",
+]);
+// These polygons are operational geofences inferred from published geographic extents
+// for each chokepoint or basin. Coordinates are [lng, lat].
+const HIGH_RISK_ZONES = [
+    {
+        id: "suez_canal",
+        name: "Suez Canal Transit Zone",
+        polygon: [
+            [32.16, 31.36],
+            [32.70, 31.36],
+            [32.74, 30.70],
+            [32.69, 29.86],
+            [32.38, 29.86],
+            [32.16, 31.36],
+        ],
+        riskType: "HIGH_TRAFFIC_ZONE",
+        severity: "medium",
+    },
+    {
+        id: "strait_of_hormuz",
+        name: "Strait of Hormuz",
+        polygon: [
+            [55.00, 26.95],
+            [56.00, 27.35],
+            [57.25, 26.85],
+            [57.15, 25.70],
+            [56.10, 25.45],
+            [55.05, 25.85],
+            [55.00, 26.95],
+        ],
+        riskType: "HIGH_TRAFFIC_ZONE",
+        severity: "high",
+    },
+    {
+        id: "gulf_of_aden",
+        name: "Gulf of Aden Piracy Zone",
+        polygon: [
+            [43.00, 10.75],
+            [44.70, 14.70],
+            [48.20, 14.85],
+            [51.27, 12.20],
+            [51.27, 10.75],
+            [43.00, 10.75],
+        ],
+        riskType: "PIRACY_RISK",
+        severity: "high",
+    },
+    {
+        id: "malacca_strait",
+        name: "Strait of Malacca",
+        polygon: [
+            [95.00, 5.95],
+            [97.80, 6.20],
+            [100.90, 5.70],
+            [103.70, 2.35],
+            [104.30, 1.00],
+            [103.35, 0.85],
+            [100.20, 1.85],
+            [97.20, 3.65],
+            [95.00, 5.95],
+        ],
+        riskType: "HIGH_TRAFFIC_ZONE",
+        severity: "medium",
+    },
+    {
+        id: "bab_el_mandeb",
+        name: "Bab-el-Mandeb Strait",
+        polygon: [
+            [42.20, 13.80],
+            [43.85, 13.80],
+            [43.95, 12.85],
+            [43.45, 12.10],
+            [42.35, 12.10],
+            [42.20, 13.80],
+        ],
+        riskType: "CONFLICT_ZONE",
+        severity: "critical",
+    },
+];
+const COMPILED_HIGH_RISK_ZONES = HIGH_RISK_ZONES.map((zone) => ({
+    ...zone,
+    feature: turf.polygon([closePolygon(zone.polygon)]),
+}));
 /**
- * FATHOM: Real-Time Fleet Ingestion Pipeline (Step 2)
+ * FATHOM: Real-Time Fleet Ingestion Pipeline (Phase 4)
  *
- * This Scheduled Cloud Function acts as an ETL (Extract, Transform, Load) worker.
- * It wakes up every 5 minutes, fetches the latest GPS coordinates from our AIS data provider
- * (currently pointing to the mock API until the Datalastic API is purchased),
- * and securely `UPSERT`s the coordinates into the FATHOM Firestore database for real-time tracking.
+ * Every five minutes this function:
+ * 1. pulls the latest vessel snapshot,
+ * 2. upserts vessel locations,
+ * 3. evaluates multi-zone geofences and stopped-vessel anomalies,
+ * 4. writes deduplicated alerts plus TTL-backed dedup markers.
  */
-exports.ingestFleetData = (0, scheduler_1.onSchedule)("every 5 minutes", async (event) => {
+exports.ingestFleetData = (0, scheduler_1.onSchedule)("every 5 minutes", async () => {
     try {
-        console.log("[FATHOM Ingestion] Waking up to fetch latest AIS fleet data...");
-        // 1. EXTRACT: Fetch the data
-        // Currently pointing to localhost mock. For production, change to:
-        // const AIS_API_URL = "https://api.datalastic.com/api/v0/vessels?...";
-        // Ensure you set the Datalastic API key in Firebase Secrets when transitioning.
-        // *NOTE: Cloud functions cannot easily call localhost. In production this will be your vercel host URL, 
-        // e.g. "https://fathom.vercel.app/api/mock/fleet". For MVP demo, you could run emulator or use ngrok.
+        console.log("[FATHOM Ingestion] Starting fleet sync and risk evaluation.");
         const AIS_API_URL = process.env.NEXTAUTH_URL
             ? `${process.env.NEXTAUTH_URL}/api/mock/fleet`
             : "http://127.0.0.1:3000/api/mock/fleet";
         const response = await fetch(AIS_API_URL);
         if (!response.ok) {
-            throw new Error(`Failed to fetch AIS data: ${response.statusText}`);
+            throw new Error(`Failed to fetch AIS data: ${response.status} ${response.statusText}`);
         }
-        const data = await response.json();
-        const vessels = data.vessels || [];
-        console.log(`[FATHOM Ingestion] Successfully extracted ${vessels.length} vessel records.`);
-        if (vessels.length === 0)
+        const payload = await response.json();
+        const vessels = Array.isArray(payload?.vessels) ? payload.vessels : [];
+        console.log(`[FATHOM Ingestion] Extracted ${vessels.length} vessel records.`);
+        if (vessels.length === 0) {
             return;
-        // 2. TRANSFORM & LOAD: Batch write to Firestore
-        const batch = db.batch();
-        // 3. THE GEOFENCING RULES ENGINE
-        // Define a mock "Sanctioned Zone" polygon (e.g., a High-Risk box near the Suez Canal where EVER GIVEN starts)
-        const highRiskZone = turf.polygon([[
-                [32.0, 29.5], // bottom-left (lng, lat)
-                [33.0, 29.5], // bottom-right
-                [33.0, 30.5], // top-right
-                [32.0, 30.5], // top-left
-                [32.0, 29.5] // close polygon
-            ]]);
+        }
+        const nowMs = Date.now();
+        const nowTimestamp = admin.firestore.Timestamp.fromMillis(nowMs);
+        const expiresAt = admin.firestore.Timestamp.fromMillis(nowMs + ALERT_DEDUP_WINDOW_MS);
+        const currentHourBucket = getHourBucket(nowMs);
+        const relevantHourBuckets = getRecentHourBuckets(currentHourBucket, ALERT_DEDUP_WINDOW_HOURS);
+        const vesselRefs = vessels.map((vessel) => db.collection("vessels").doc(String(vessel.id)));
+        const existingVesselSnapshots = vesselRefs.length > 0 ? await db.getAll(...vesselRefs) : [];
+        const existingVesselById = new Map(existingVesselSnapshots.map((snapshot) => [snapshot.id, snapshot.data() ?? {}]));
+        let batch = db.batch();
+        let batchOperationCount = 0;
+        const commitPromises = [];
+        const queueSet = (ref, data, options) => {
+            if (options) {
+                batch.set(ref, data, options);
+            }
+            else {
+                batch.set(ref, data);
+            }
+            batchOperationCount += 1;
+            if (batchOperationCount >= MAX_BATCH_OPERATIONS) {
+                commitPromises.push(batch.commit());
+                batch = db.batch();
+                batchOperationCount = 0;
+            }
+        };
+        const candidateAlertsByScope = new Map();
         for (const vessel of vessels) {
-            // A. Update Vessel Location
-            // Using batch.set() with { merge: true } performs an "UPSERT". 
-            // If the ship already exists, only its coordinates update. If it's a new ship, it is created.
-            const vesselRef = db.collection("vessels").doc(vessel.id);
-            batch.set(vesselRef, {
+            const vesselId = String(vessel.id);
+            const existingVessel = existingVesselById.get(vesselId) ?? {};
+            const organizationId = getOrganizationId(vessel, existingVessel);
+            const vesselName = getVesselName(vessel, existingVessel);
+            const lat = getNumber(vessel.lat, existingVessel.lat);
+            const lng = getNumber(vessel.lng, existingVessel.lng);
+            const speed = getNumber(vessel.speed, existingVessel.speed) ?? 0;
+            const status = getString(vessel.status, existingVessel.status)?.toLowerCase() ?? "unknown";
+            queueSet(db.collection("vessels").doc(vesselId), {
+                ...existingVessel,
                 ...vessel,
-                lastUpdated: admin.firestore.FieldValue.serverTimestamp()
+                id: vesselId,
+                name: vesselName,
+                organizationId,
+                lat,
+                lng,
+                speed,
+                status,
+                lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
             }, { merge: true });
-            // B. Execute Geofencing Rule
-            // Check if the vessel has entered the Sanctioned Zone
-            const shipPoint = turf.point([vessel.lng, vessel.lat]);
-            const isInsideZone = turf.booleanPointInPolygon(shipPoint, highRiskZone);
-            if (isInsideZone) {
-                // Generate a real-time Fraud/Risk Alert
-                // We use a unique ID combining the breach type, vessel ID, and current time
-                const alertRef = db.collection("alerts").doc(`zone_breach_${vessel.id}_${Date.now()}`);
-                batch.set(alertRef, {
-                    type: "Sanctioned Zone Breach",
-                    vesselId: vessel.id,
-                    vesselName: vessel.name,
-                    timestamp: admin.firestore.FieldValue.serverTimestamp(),
-                    location: { lat: vessel.lat, lng: vessel.lng },
-                    severity: "high",
-                    status: "active",
-                    description: `${vessel.name} (IMO: ${vessel.imo}) has entered a designated High-Risk Sanctioned Zone.`
+            if (!isFiniteCoordinate(lat) || !isFiniteCoordinate(lng)) {
+                console.warn(`[FATHOM Ingestion] Skipping risk evaluation for vessel ${vesselId}: invalid coordinates.`);
+                continue;
+            }
+            const vesselPoint = turf.point([lng, lat]);
+            for (const zone of COMPILED_HIGH_RISK_ZONES) {
+                if (!turf.booleanPointInPolygon(vesselPoint, zone.feature)) {
+                    continue;
+                }
+                const candidate = buildZoneAlertCandidate({
+                    vessel,
+                    vesselId,
+                    vesselName,
+                    organizationId,
+                    lat,
+                    lng,
+                    zone,
                 });
-                console.warn(`[ALERT] Generated zone breach alert for ${vessel.name}`);
+                candidateAlertsByScope.set(`${candidate.vesselId}:${candidate.dedupScopeId}`, candidate);
+            }
+            if (isStoppedInOpenWater(vessel, existingVessel, speed, status)) {
+                const candidate = buildStoppedAlertCandidate({
+                    vesselId,
+                    vesselName,
+                    organizationId,
+                    lat,
+                    lng,
+                });
+                candidateAlertsByScope.set(`${candidate.vesselId}:${candidate.dedupScopeId}`, candidate);
             }
         }
-        await batch.commit();
-        console.log(`[FATHOM Ingestion] Successfully synced ${vessels.length} vessels and generated alerts into Firestore.`);
+        const dedupRefs = [];
+        const dedupRefIds = new Set();
+        for (const candidate of candidateAlertsByScope.values()) {
+            for (const hourBucket of relevantHourBuckets) {
+                const dedupRef = db.collection("alertDedup").doc(buildDedupDocId(candidate.vesselId, candidate.dedupScopeId, hourBucket));
+                if (dedupRefIds.has(dedupRef.id)) {
+                    continue;
+                }
+                dedupRefs.push(dedupRef);
+                dedupRefIds.add(dedupRef.id);
+            }
+        }
+        const dedupSnapshots = dedupRefs.length > 0 ? await db.getAll(...dedupRefs) : [];
+        const activeDedupIds = new Set();
+        for (const snapshot of dedupSnapshots) {
+            if (!snapshot.exists) {
+                continue;
+            }
+            const expiresAtValue = snapshot.get("expiresAt");
+            const expiresAtMs = expiresAtValue instanceof admin.firestore.Timestamp
+                ? expiresAtValue.toMillis()
+                : expiresAtValue?.toMillis?.() ?? 0;
+            if (expiresAtMs > nowMs) {
+                activeDedupIds.add(snapshot.id);
+            }
+        }
+        let createdAlertCount = 0;
+        let skippedAlertCount = 0;
+        for (const candidate of candidateAlertsByScope.values()) {
+            const hasRecentDuplicate = relevantHourBuckets.some((hourBucket) => activeDedupIds.has(buildDedupDocId(candidate.vesselId, candidate.dedupScopeId, hourBucket)));
+            if (hasRecentDuplicate) {
+                skippedAlertCount += 1;
+                continue;
+            }
+            const alertRef = db.collection("alerts").doc();
+            const dedupDocId = buildDedupDocId(candidate.vesselId, candidate.dedupScopeId, currentHourBucket);
+            queueSet(alertRef, {
+                type: candidate.type,
+                vesselId: candidate.vesselId,
+                vesselName: candidate.vesselName,
+                timestamp: nowTimestamp,
+                location: candidate.location,
+                severity: candidate.severity,
+                status: candidate.status,
+                description: candidate.description,
+                zoneId: candidate.zoneId,
+                organizationId: candidate.organizationId,
+            });
+            queueSet(db.collection("alertDedup").doc(dedupDocId), {
+                vesselId: candidate.vesselId,
+                zoneId: candidate.zoneId,
+                dedupScopeId: candidate.dedupScopeId,
+                type: candidate.type,
+                createdAt: nowTimestamp,
+                expiresAt,
+            });
+            activeDedupIds.add(dedupDocId);
+            createdAlertCount += 1;
+        }
+        if (batchOperationCount > 0) {
+            commitPromises.push(batch.commit());
+        }
+        await Promise.all(commitPromises);
+        console.log(`[FATHOM Ingestion] Synced ${vessels.length} vessels, created ${createdAlertCount} alerts, skipped ${skippedAlertCount} duplicates.`);
     }
     catch (error) {
         console.error("[FATHOM Ingestion] Pipeline Error:", error);
     }
 });
+function buildZoneAlertCandidate(params) {
+    const { vessel, vesselId, vesselName, organizationId, lat, lng, zone } = params;
+    const imoSuffix = getString(vessel.imo) ? ` (IMO: ${vessel.imo})` : "";
+    return {
+        type: zone.riskType,
+        vesselId,
+        vesselName,
+        severity: zone.severity,
+        status: "open",
+        description: `${vesselName}${imoSuffix} entered ${zone.name}.`,
+        zoneId: zone.id,
+        organizationId,
+        location: { lat, lng },
+        dedupScopeId: zone.id,
+    };
+}
+function buildStoppedAlertCandidate(params) {
+    const { vesselId, vesselName, organizationId, lat, lng } = params;
+    return {
+        type: "VESSEL_STOPPED",
+        vesselId,
+        vesselName,
+        severity: "high",
+        status: "open",
+        description: `${vesselName} appears stopped in open water with speed below ${STOPPED_VESSEL_THRESHOLD_KNOTS} knots.`,
+        zoneId: null,
+        organizationId,
+        location: { lat, lng },
+        dedupScopeId: STOPPED_VESSEL_DEDUP_SCOPE,
+    };
+}
+function buildDedupDocId(vesselId, scopeId, hourBucket) {
+    return `${vesselId}_${scopeId}_${hourBucket}`;
+}
+function closePolygon(polygon) {
+    if (polygon.length === 0) {
+        return polygon;
+    }
+    const [firstLng, firstLat] = polygon[0];
+    const [lastLng, lastLat] = polygon[polygon.length - 1];
+    if (firstLng === lastLng && firstLat === lastLat) {
+        return polygon;
+    }
+    return [...polygon, polygon[0]];
+}
+function getHourBucket(timestampMs) {
+    return Math.floor(timestampMs / HOURS_TO_MS);
+}
+function getRecentHourBuckets(currentHourBucket, hours) {
+    const buckets = [];
+    for (let offset = 0; offset < hours; offset += 1) {
+        buckets.push(currentHourBucket - offset);
+    }
+    return buckets;
+}
+function getOrganizationId(vessel, existingVessel) {
+    return (getString(vessel.organizationId) ??
+        getString(vessel.orgId) ??
+        getString(existingVessel.organizationId) ??
+        getString(existingVessel.orgId) ??
+        null);
+}
+function getVesselName(vessel, existingVessel) {
+    return getString(vessel.name, existingVessel.name) ?? `Vessel ${vessel.id}`;
+}
+function getString(...values) {
+    for (const value of values) {
+        if (typeof value === "string" && value.trim().length > 0) {
+            return value.trim();
+        }
+    }
+    return null;
+}
+function getNumber(...values) {
+    for (const value of values) {
+        if (typeof value === "number" && Number.isFinite(value)) {
+            return value;
+        }
+    }
+    return undefined;
+}
+function isFiniteCoordinate(value) {
+    return typeof value === "number" && Number.isFinite(value);
+}
+function isStoppedInOpenWater(vessel, existingVessel, speed, normalizedStatus) {
+    if (speed >= STOPPED_VESSEL_THRESHOLD_KNOTS) {
+        return false;
+    }
+    if (PORT_LIKE_STATUSES.has(normalizedStatus)) {
+        return false;
+    }
+    const eta = getString(vessel.eta, existingVessel.eta)?.toLowerCase();
+    if (eta === "arrived") {
+        return false;
+    }
+    return true;
+}
 //# sourceMappingURL=index.js.map

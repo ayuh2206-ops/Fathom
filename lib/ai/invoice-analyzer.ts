@@ -1,6 +1,21 @@
 import "server-only"
 
 import OpenAI from "openai"
+import { fromBuffer } from "pdf2pic"
+
+async function convertPdfToImage(pdfBuffer: Buffer): Promise<string> {
+   const options = {
+     density: 300,
+     saveFilename: "invoice_page",
+     savePath: "/tmp",
+     format: "png",
+     width: 1600,
+     height: 2262
+   };
+   const convert = fromBuffer(pdfBuffer, options);
+   const result = await convert(1, { responseType: "base64" });
+   return result.base64 as string;
+}
 
 export interface ExtractedInvoiceFields {
     invoiceNumber: string | null
@@ -349,23 +364,15 @@ function normalizeDisputeDraft(data: JsonObject): DisputeDraft {
     }
 }
 
-function getFileContentParts(fileBuffer: Buffer, mimeType: string): UserContentPart[] {
-    const base64 = fileBuffer.toString("base64")
+async function getFileContentParts(fileBuffer: Buffer, mimeType: string): Promise<UserContentPart[]> {
+    let base64 = "";
+    let finalMimeType = mimeType;
 
     if (mimeType === "application/pdf") {
-        return [
-            {
-                type: "text",
-                text: "Review this freight invoice PDF. Focus on the invoice data that is explicitly present in the document and do not infer missing values.",
-            },
-            {
-                type: "file",
-                file: {
-                    file_data: base64,
-                    filename: "invoice.pdf",
-                },
-            },
-        ]
+        base64 = await convertPdfToImage(fileBuffer);
+        finalMimeType = "image/png";
+    } else {
+        base64 = fileBuffer.toString("base64");
     }
 
     return [
@@ -376,7 +383,7 @@ function getFileContentParts(fileBuffer: Buffer, mimeType: string): UserContentP
         {
             type: "image_url",
             image_url: {
-                url: `data:${mimeType};base64,${base64}`,
+                url: `data:${finalMimeType};base64,${base64}`,
                 detail: "high",
             },
         },
@@ -397,7 +404,7 @@ export async function extractInvoiceFields(fileBuffer: Buffer, mimeType: string)
                 },
                 {
                     role: "user",
-                    content: getFileContentParts(fileBuffer, mimeType),
+                    content: await getFileContentParts(fileBuffer, mimeType),
                 },
             ],
         })

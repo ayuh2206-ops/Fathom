@@ -1,13 +1,5 @@
 {
   "framework": "nextjs",
   "buildCommand": "npm run build",
-  "regions": ["sin1"],
-  "functions": {
-    "app/api/invoices/[id]/analyze/route.ts": {
-      "maxDuration": 60
-    },
-    "app/api/webhooks/razorpay/route.ts": {
-      "maxDuration": 10
-    }
-  }
+  "regions": ["sin1"]
 }

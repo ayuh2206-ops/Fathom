@@ -15,7 +15,7 @@ import { sendInvoiceAnalysisComplete } from "@/lib/email/sendgrid"
 import { rateLimit } from "@/lib/rate-limit"
 
 export const runtime = "nodejs"
-
+export const maxDuration = 60
 type InvoiceStatus =
     | "uploaded"
     | "pending"

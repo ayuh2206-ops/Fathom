@@ -3,7 +3,11 @@ import {
  welcomeTemplate, analysisTemplate, alertTemplate, inviteTemplate, disputeTemplate
 } from './templates';
  
-sgMail.setApiKey(process.env.SENDGRID_API_KEY!);
+if (process.env.SENDGRID_API_KEY) {
+  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+} else {
+  console.warn('SENDGRID_API_KEY is not set. Emails won\'t be sent.');
+}
  
 const FROM = {
  email: process.env.SENDGRID_FROM_EMAIL!,

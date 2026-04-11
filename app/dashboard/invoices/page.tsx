@@ -43,6 +43,11 @@ export default function InvoicesPage() {
     const [isLoading, setIsLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
 
+    const upsertInvoice = useCallback((invoice: InvoiceApiResponse) => {
+        const mappedInvoice = mapInvoice(invoice)
+        setInvoices((current) => [mappedInvoice, ...current.filter((item) => item.id !== mappedInvoice.id)])
+    }, [])
+
     const loadInvoices = useCallback(async () => {
         setIsLoading(true)
         setError(null)
@@ -75,15 +80,17 @@ export default function InvoicesPage() {
             method: "POST",
             body: formData,
         })
+        const payload = await response.json().catch(() => ({}))
 
         if (!response.ok) {
-            const payload = await response.json().catch(() => ({}))
+            if (payload.invoice) {
+                upsertInvoice(payload.invoice as InvoiceApiResponse)
+            }
             throw new Error(payload.message || "Upload failed")
         }
 
-        const payload = await response.json()
-        setInvoices((current) => [mapInvoice(payload.invoice as InvoiceApiResponse), ...current])
-    }, [])
+        upsertInvoice(payload.invoice as InvoiceApiResponse)
+    }, [upsertInvoice])
 
     const handleDelete = useCallback(async (id: string) => {
         const response = await fetch(`/api/invoices/${id}`, { method: "DELETE" })

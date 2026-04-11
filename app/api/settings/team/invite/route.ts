@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth-options"
 import { getFirebaseFirestore } from "@/lib/firebase-admin"
 import { FieldValue } from "firebase-admin/firestore"
 import { sendTeamInvite } from "@/lib/email/sendgrid"
+import { getOptionalServerSession } from "@/lib/server-session"
 
 export async function POST(req: NextRequest) {
-    const session = await getServerSession(authOptions)
+    const session = await getOptionalServerSession()
     if (!session?.user?.organizationId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     try {

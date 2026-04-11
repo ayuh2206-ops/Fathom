@@ -6,16 +6,16 @@ import {
     extractInvoiceFields,
     generateDisputeDraft,
 } from "@/lib/ai/invoice-analyzer"
-import { authOptions } from "@/lib/auth-options"
 import { admin, getFirebaseFirestore, getFirebaseStorage } from "@/lib/firebase-admin"
+import { getSignedInvoiceFileUrl } from "@/lib/invoices/file-url"
+import { getOptionalServerSession } from "@/lib/server-session"
 import { Timestamp } from "firebase-admin/firestore"
-import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import { sendInvoiceAnalysisComplete } from "@/lib/email/sendgrid"
 import { rateLimit } from "@/lib/rate-limit"
 
 export const runtime = "nodejs"
-export const maxDuration = 60
+export const maxDuration = 120
 type InvoiceStatus =
     | "uploaded"
     | "pending"
@@ -143,17 +143,7 @@ function serializeInvoice(doc: FirebaseFirestore.DocumentSnapshot, fileUrl: stri
 }
 
 async function getSignedFileUrl(filePath?: string): Promise<string | null> {
-    if (!filePath) {
-        return null
-    }
-
-    const storage = getFirebaseStorage()
-    const [signedUrl] = await storage.bucket().file(filePath).getSignedUrl({
-        action: "read",
-        expires: Date.now() + 15 * 60 * 1000,
-    })
-
-    return signedUrl
+    return getSignedInvoiceFileUrl(filePath)
 }
 
 function getAverageRateFromLineItems(
@@ -242,8 +232,58 @@ async function buildHistoricalContext(
     }
 }
 
+function getFallbackInvoiceNumber(invoiceId: string, invoiceNumber?: string): string {
+    if (typeof invoiceNumber === "string" && invoiceNumber.trim().length > 0) {
+        return invoiceNumber.trim()
+    }
+
+    return `INV-${invoiceId.slice(0, 8)}`
+}
+
+function getFallbackVendor(vendor?: string): string {
+    if (typeof vendor === "string" && vendor.trim().length > 0) {
+        return vendor.trim()
+    }
+
+    return "Unknown Vendor"
+}
+
+function getFallbackAmount(amount?: number): number {
+    return typeof amount === "number" && Number.isFinite(amount) ? amount : 0
+}
+
+function getFallbackCurrency(currency?: string): string {
+    if (typeof currency === "string" && currency.trim().length > 0) {
+        return currency.trim().toUpperCase()
+    }
+
+    return "USD"
+}
+
+function hasUsableExtractedData(extractedFields: ExtractedInvoiceFields): boolean {
+    return [
+        extractedFields.invoiceNumber,
+        extractedFields.invoiceDate,
+        extractedFields.dueDate,
+        extractedFields.vendorName,
+        extractedFields.vendorAddress,
+        extractedFields.clientName,
+        extractedFields.currency,
+        extractedFields.subtotal,
+        extractedFields.taxAmount,
+        extractedFields.totalAmount,
+        extractedFields.portOfLoading,
+        extractedFields.portOfDischarge,
+        extractedFields.vesselName,
+        extractedFields.billOfLadingNumber,
+        extractedFields.detentionDays,
+        extractedFields.demurrageDays,
+        extractedFields.freeTimeDays,
+    ].some((value) => value !== null) || extractedFields.lineItems.length > 0 || extractedFields.containerNumbers.length > 0
+}
+
 export async function POST(_: Request, { params }: { params: { id: string } }) {
-    const session = await getServerSession(authOptions)
+    const session = await getOptionalServerSession()
 
     if (!session?.user?.id || !session.user.organizationId) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -291,6 +331,10 @@ export async function POST(_: Request, { params }: { params: { id: string } }) {
         const [fileBuffer] = await storage.bucket().file(invoiceData.filePath).download()
         const mimeType = inferMimeType(invoiceData.fileName, invoiceData.mimeType)
         const extractedFields = await extractInvoiceFields(fileBuffer, mimeType)
+        if (!hasUsableExtractedData(extractedFields)) {
+            throw new Error("Invoice extraction returned no usable fields.")
+        }
+
         const historicalContext = await buildHistoricalContext(
             firestore,
             session.user.organizationId,
@@ -303,12 +347,20 @@ export async function POST(_: Request, { params }: { params: { id: string } }) {
                 : null
 
         const nextStatus: InvoiceStatus = fraudResult.fraudScore >= 61 ? "flagged" : "analyzed"
+        const nextInvoiceNumber = extractedFields.invoiceNumber ?? getFallbackInvoiceNumber(invoiceDoc.id, invoiceData.invoiceNumber)
+        const nextVendor = extractedFields.vendorName ?? getFallbackVendor(invoiceData.vendor)
+        const nextAmount = extractedFields.totalAmount ?? getFallbackAmount(invoiceData.amount)
+        const nextCurrency = extractedFields.currency ?? getFallbackCurrency(invoiceData.currency)
 
         await invoiceRef.set(
             {
                 createdAt: invoiceData.createdAt ?? admin.firestore.FieldValue.serverTimestamp(),
                 updatedAt: admin.firestore.FieldValue.serverTimestamp(),
                 analyzedAt: admin.firestore.FieldValue.serverTimestamp(),
+                invoiceNumber: nextInvoiceNumber,
+                vendor: nextVendor,
+                amount: nextAmount,
+                currency: nextCurrency,
                 status: nextStatus,
                 fraudScore: fraudResult.fraudScore,
                 riskLevel: fraudResult.riskLevel,
@@ -332,10 +384,9 @@ export async function POST(_: Request, { params }: { params: { id: string } }) {
         const signedFileUrl = await getSignedFileUrl(invoiceData.filePath)
 
         if (session.user.email) {
-            const invoiceNumberStr = String(invoiceData.invoiceNumber || `INV-${invoiceDoc.id.slice(0, 8)}`)
             void sendInvoiceAnalysisComplete(
                 session.user.email,
-                invoiceNumberStr,
+                nextInvoiceNumber,
                 fraudResult.fraudScore,
                 fraudResult.riskLevel,
                 `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/dashboard/invoices/${invoiceDoc.id}`

@@ -1,11 +1,11 @@
-import { authOptions } from "@/lib/auth-options"
 import { getFirebaseFirestore, getFirebaseStorage } from "@/lib/firebase-admin"
+import { getOptionalServerSession } from "@/lib/server-session"
 import { FieldValue, Timestamp } from "firebase-admin/firestore"
-import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 import path from "path"
 
 export const runtime = "nodejs"
+export const maxDuration = 120
 
 const MAX_INVOICE_SIZE_BYTES = 10 * 1024 * 1024
 const SUPPORTED_TYPES = new Set([
@@ -68,7 +68,7 @@ function sanitizeFilename(fileName: string): string {
 }
 
 export async function GET() {
-    const session = await getServerSession(authOptions)
+    const session = await getOptionalServerSession()
 
     if (!session?.user?.id || !session.user.organizationId) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -93,7 +93,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-    const session = await getServerSession(authOptions)
+    const session = await getOptionalServerSession()
 
     if (!session?.user?.id || !session.user.organizationId) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -126,8 +126,6 @@ export async function POST(req: Request) {
         const bucket = storage.bucket()
         const storageFile = bucket.file(filePath)
 
-        let signedUrl = "https://mock-invoice-url.com/fathom-demo.pdf"
-
         try {
             await storageFile.save(Buffer.from(bytes), {
                 contentType: file.type,
@@ -135,18 +133,12 @@ export async function POST(req: Request) {
                     cacheControl: "private, max-age=0, no-transform",
                 },
             })
-
-            const [realSignedUrl] = await storageFile.getSignedUrl({
-                action: "read",
-                expires: Date.now() + 7 * 24 * 60 * 60 * 1000,
-            })
-            signedUrl = realSignedUrl
         } catch (storageError: unknown) {
             const err = storageError instanceof Error ? storageError.message : String(storageError)
-            console.warn("Firebase Storage upload failed (Bucket likely not initialized). Falling back to mock URL.", err)
+            throw new Error(`Firebase Storage upload failed: ${err}`)
         }
 
-        const invoiceNumber = String(formData.get("invoiceNumber") || `INV-${Date.now()}`)
+        const invoiceNumber = String(formData.get("invoiceNumber") || `INV-${invoiceId.slice(0, 8)}`)
         const vendor = String(formData.get("vendor") || "Unknown Vendor")
         const amountRaw = Number(formData.get("amount") || 0)
         const amount = Number.isFinite(amountRaw) ? amountRaw : 0
@@ -165,7 +157,7 @@ export async function POST(req: Request) {
             riskLevel: null,
             filePath,
             fileName: file.name,
-            fileUrl: signedUrl,
+            fileUrl: null,
             mimeType: file.type,
             extractedFields: null,
             fraudFlags: [],
@@ -181,17 +173,36 @@ export async function POST(req: Request) {
 
         const analyzeUrl = new URL(`/api/invoices/${invoiceId}/analyze`, req.url)
         const cookieHeader = req.headers.get("cookie") ?? ""
-        void fetch(analyzeUrl, {
+        const analyzeResponse = await fetch(analyzeUrl, {
             method: "POST",
             headers: cookieHeader ? { cookie: cookieHeader } : undefined,
-        }).catch((analysisError: unknown) => {
-            console.error("Background invoice analysis trigger failed:", analysisError)
+            cache: "no-store",
         })
 
-        const created = await ref.get()
-        return NextResponse.json({ invoice: toInvoiceRecord(created) }, { status: 201 })
+        const payload = await analyzeResponse.json().catch(() => ({}))
+        if (!analyzeResponse.ok) {
+            const created = await ref.get()
+            const message =
+                typeof payload.error === "string"
+                    ? payload.error
+                    : typeof payload.message === "string"
+                        ? payload.message
+                        : "Invoice uploaded but analysis failed"
+
+            return NextResponse.json(
+                {
+                    invoiceId,
+                    invoice: toInvoiceRecord(created),
+                    message,
+                },
+                { status: analyzeResponse.status }
+            )
+        }
+
+        return NextResponse.json(payload, { status: 201 })
     } catch (error) {
         console.error("Invoice upload error:", error)
-        return NextResponse.json({ message: "Failed to upload invoice" }, { status: 500 })
+        const message = error instanceof Error ? error.message : "Failed to upload invoice"
+        return NextResponse.json({ message }, { status: 500 })
     }
 }

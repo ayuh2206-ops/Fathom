@@ -1,8 +1,8 @@
 import type { DisputeDraft, ExtractedInvoiceFields, FraudAnalysisResult } from "@/lib/ai/invoice-analyzer"
-import { authOptions } from "@/lib/auth-options"
 import { getFirebaseFirestore, getFirebaseStorage } from "@/lib/firebase-admin"
+import { getSignedInvoiceFileUrl } from "@/lib/invoices/file-url"
+import { getOptionalServerSession } from "@/lib/server-session"
 import { Timestamp } from "firebase-admin/firestore"
-import { getServerSession } from "next-auth"
 import { NextResponse } from "next/server"
 
 export const runtime = "nodejs"
@@ -58,7 +58,7 @@ function toIsoNullable(value: unknown): string | null {
 }
 
 async function getAuthenticatedOrg() {
-    const session = await getServerSession(authOptions)
+    const session = await getOptionalServerSession()
     const organizationId = session?.user?.organizationId
 
     if (!session?.user?.id || !organizationId) {
@@ -87,7 +87,6 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
 
     try {
         const firestore = getFirebaseFirestore()
-        const storage = getFirebaseStorage()
         const doc = await firestore.collection("invoices").doc(params.id).get()
         if (!doc.exists) {
             return NextResponse.json({ message: "Invoice not found" }, { status: 404 })
@@ -101,11 +100,7 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
         let fileUrl: string | null = data?.fileUrl ? String(data.fileUrl) : null
         const filePath = data?.filePath as string | undefined
         if (filePath) {
-            const [signedUrl] = await storage.bucket().file(filePath).getSignedUrl({
-                action: "read",
-                expires: Date.now() + 15 * 60 * 1000,
-            })
-            fileUrl = signedUrl
+            fileUrl = await getSignedInvoiceFileUrl(filePath)
         }
 
         return NextResponse.json(

@@ -1,21 +1,6 @@
 import "server-only"
 
 import OpenAI from "openai"
-import { fromBuffer } from "pdf2pic"
-
-async function convertPdfToImage(pdfBuffer: Buffer): Promise<string> {
-   const options = {
-     density: 300,
-     saveFilename: "invoice_page",
-     savePath: "/tmp",
-     format: "png",
-     width: 1600,
-     height: 2262
-   };
-   const convert = fromBuffer(pdfBuffer, options);
-   const result = await convert(1, { responseType: "base64" });
-   return result.base64 as string;
-}
 
 export interface ExtractedInvoiceFields {
     invoiceNumber: string | null
@@ -86,37 +71,23 @@ type UserContentPart =
             detail?: "auto" | "low" | "high"
         }
     }
+
+type ResponseInputPart =
     | {
-        type: "file"
-        file: {
-            file_data: string
-            filename: string
-        }
+        type: "input_text"
+        text: string
+    }
+    | {
+        type: "input_file"
+        filename: string
+        file_data: string
     }
 
 const EXTRACTION_MODEL = "gpt-4o-mini"
-
-const EMPTY_EXTRACTED_FIELDS: ExtractedInvoiceFields = {
-    invoiceNumber: null,
-    invoiceDate: null,
-    dueDate: null,
-    vendorName: null,
-    vendorAddress: null,
-    clientName: null,
-    currency: null,
-    subtotal: null,
-    taxAmount: null,
-    totalAmount: null,
-    lineItems: [],
-    portOfLoading: null,
-    portOfDischarge: null,
-    vesselName: null,
-    billOfLadingNumber: null,
-    containerNumbers: [],
-    detentionDays: null,
-    demurrageDays: null,
-    freeTimeDays: null,
-}
+const EXTRACTION_SYSTEM_PROMPT =
+    "You are a maritime freight invoice parser. Extract all fields from the invoice image/document provided. Return ONLY valid JSON matching the ExtractedInvoiceFields schema. Use null for any field you cannot find. Do not guess and do not infer missing values."
+const EXTRACTION_USER_PROMPT =
+    "Review this freight invoice document. Extract only the fields that are explicitly present in the invoice."
 
 let openAIClient: OpenAI | null = null
 
@@ -154,6 +125,14 @@ function getMessageContent(messageContent: string | null | undefined): string {
     }
 
     return messageContent
+}
+
+function getResponseText(response: { output_text?: string | null }): string {
+    if (typeof response.output_text !== "string" || response.output_text.trim().length === 0) {
+        throw new Error("OpenAI response did not contain message content.")
+    }
+
+    return response.output_text
 }
 
 function asString(value: unknown): string | null {
@@ -364,21 +343,14 @@ function normalizeDisputeDraft(data: JsonObject): DisputeDraft {
     }
 }
 
-async function getFileContentParts(fileBuffer: Buffer, mimeType: string): Promise<UserContentPart[]> {
-    let base64 = "";
-    let finalMimeType = mimeType;
-
-    if (mimeType === "application/pdf") {
-        base64 = await convertPdfToImage(fileBuffer);
-        finalMimeType = "image/png";
-    } else {
-        base64 = fileBuffer.toString("base64");
-    }
+function getImageContentParts(fileBuffer: Buffer, mimeType: string): UserContentPart[] {
+    const base64 = fileBuffer.toString("base64")
+    const finalMimeType = mimeType === "image/jpg" ? "image/jpeg" : mimeType
 
     return [
         {
             type: "text",
-            text: "Review this freight invoice image. Extract only the fields that are explicitly present in the invoice and do not infer missing values.",
+            text: EXTRACTION_USER_PROMPT,
         },
         {
             type: "image_url",
@@ -390,31 +362,57 @@ async function getFileContentParts(fileBuffer: Buffer, mimeType: string): Promis
     ]
 }
 
-export async function extractInvoiceFields(fileBuffer: Buffer, mimeType: string): Promise<ExtractedInvoiceFields> {
-    try {
-        const client = getOpenAIClient()
-        const completion = await client.chat.completions.create({
-            model: EXTRACTION_MODEL,
-            response_format: { type: "json_object" },
-            temperature: 0.1,
-            messages: [
-                {
-                    role: "system",
-                    content: "You are a maritime freight invoice parser. Extract all fields from the invoice image/document provided. Return ONLY valid JSON matching the ExtractedInvoiceFields schema. Use null for any field you cannot find. Do not guess — only extract what is explicitly present.",
-                },
-                {
-                    role: "user",
-                    content: await getFileContentParts(fileBuffer, mimeType),
-                },
-            ],
-        })
+async function extractInvoiceFieldsFromPdf(fileBuffer: Buffer): Promise<ExtractedInvoiceFields> {
+    const client = getOpenAIClient()
+    const completion = await client.responses.create({
+        model: EXTRACTION_MODEL,
+        temperature: 0.1,
+        instructions: EXTRACTION_SYSTEM_PROMPT,
+        input: [
+            {
+                role: "user",
+                content: [
+                    {
+                        type: "input_text",
+                        text: EXTRACTION_USER_PROMPT,
+                    },
+                    {
+                        type: "input_file",
+                        filename: "invoice.pdf",
+                        file_data: `data:application/pdf;base64,${fileBuffer.toString("base64")}`,
+                    },
+                ] satisfies ResponseInputPart[],
+            },
+        ],
+    })
 
-        const content = getMessageContent(completion.choices[0]?.message?.content)
-        return normalizeExtractedFields(parseJson(content))
-    } catch (error: unknown) {
-        console.error("Invoice field extraction failed:", error)
-        return { ...EMPTY_EXTRACTED_FIELDS }
+    return normalizeExtractedFields(parseJson(getResponseText(completion)))
+}
+
+export async function extractInvoiceFields(fileBuffer: Buffer, mimeType: string): Promise<ExtractedInvoiceFields> {
+    if (mimeType === "application/pdf") {
+        return extractInvoiceFieldsFromPdf(fileBuffer)
     }
+
+    const client = getOpenAIClient()
+    const completion = await client.chat.completions.create({
+        model: EXTRACTION_MODEL,
+        response_format: { type: "json_object" },
+        temperature: 0.1,
+        messages: [
+            {
+                role: "system",
+                content: EXTRACTION_SYSTEM_PROMPT,
+            },
+            {
+                role: "user",
+                content: getImageContentParts(fileBuffer, mimeType),
+            },
+        ],
+    })
+
+    const content = getMessageContent(completion.choices[0]?.message?.content)
+    return normalizeExtractedFields(parseJson(content))
 }
 
 export async function analyzeForFraud(

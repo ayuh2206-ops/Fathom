@@ -2,13 +2,26 @@ import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { getFirebaseFirestore } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
+import { isRazorpayConfigured } from '@/lib/razorpay';
  
 function verifySignature(body: string, signature: string): boolean {
+ const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
+ if (!secret || !signature) {
+   return false;
+ }
+
  const expected = crypto
-   .createHmac('sha256', process.env.RAZORPAY_WEBHOOK_SECRET!)
+   .createHmac('sha256', secret)
    .update(body)
    .digest('hex');
- return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
+ const expectedBuffer = Buffer.from(expected);
+ const providedBuffer = Buffer.from(signature);
+
+ if (expectedBuffer.length !== providedBuffer.length) {
+   return false;
+ }
+
+ return crypto.timingSafeEqual(expectedBuffer, providedBuffer);
 }
  
 async function findOrgBySubscriptionId(subscriptionId: string): Promise<string | null> {
@@ -20,6 +33,10 @@ async function findOrgBySubscriptionId(subscriptionId: string): Promise<string |
 }
  
 export async function POST(req: NextRequest) {
+ if (!isRazorpayConfigured() || !process.env.RAZORPAY_WEBHOOK_SECRET) {
+   return NextResponse.json({ error: 'Billing webhook is not configured' }, { status: 503 });
+ }
+
  const body = await req.text();
  const signature = req.headers.get('x-razorpay-signature') ?? '';
  

@@ -7,7 +7,9 @@
     "build": "next build",
     "postbuild": "echo Build complete",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "typecheck": "tsc -p tsconfig.typecheck.json --noEmit",
+    "test:smoke": "node test_mvp.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

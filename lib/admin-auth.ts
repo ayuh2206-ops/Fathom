@@ -15,6 +15,14 @@ function getRequiredEnv(name: "ADMIN_USERNAME" | "ADMIN_PASSWORD" | "ADMIN_PANEL
     return value
 }
 
+export function isAdminAuthConfigured(): boolean {
+    return Boolean(
+        process.env.ADMIN_USERNAME &&
+        process.env.ADMIN_PASSWORD &&
+        process.env.ADMIN_PANEL_SECRET
+    )
+}
+
 function getAdminUsername(): string { return getRequiredEnv("ADMIN_USERNAME") }
 function getAdminPassword(): string { return getRequiredEnv("ADMIN_PASSWORD") }
 function getAdminSecret(): string { return getRequiredEnv("ADMIN_PANEL_SECRET") }

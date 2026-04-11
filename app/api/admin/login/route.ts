@@ -2,6 +2,7 @@ import {
     ADMIN_SESSION_COOKIE,
     ADMIN_SESSION_MAX_AGE_SECONDS,
     createAdminSessionToken,
+    isAdminAuthConfigured,
     verifyAdminCredentials,
 } from "@/lib/admin-auth"
 import { NextResponse } from "next/server"
@@ -32,6 +33,13 @@ export async function POST(request: Request) {
 
         if (!parsed.success) {
             return NextResponse.json({ message: "Invalid payload" }, { status: 400 })
+        }
+
+        if (!isAdminAuthConfigured()) {
+            return NextResponse.json(
+                { message: "Admin authentication is not configured" },
+                { status: 503 }
+            )
         }
 
         const name = parsed.data.name.trim()

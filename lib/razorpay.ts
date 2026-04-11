@@ -1,5 +1,15 @@
 import Razorpay from 'razorpay';
  
+export function isRazorpayConfigured(): boolean {
+ return Boolean(
+   process.env.RAZORPAY_KEY_ID &&
+   process.env.RAZORPAY_KEY_SECRET &&
+   process.env.RAZORPAY_PLAN_SCOUT &&
+   process.env.RAZORPAY_PLAN_NAVIGATOR &&
+   process.env.RAZORPAY_PLAN_ADMIRAL
+ );
+}
+
 if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
   console.warn('RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET are not set. Payments will not work.');
 }

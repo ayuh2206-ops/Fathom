@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth-options';
-import { razorpay, PLAN_IDS } from '@/lib/razorpay';
+import { isRazorpayConfigured, razorpay, PLAN_IDS } from '@/lib/razorpay';
 import { getFirebaseFirestore } from '@/lib/firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
+import { getOptionalServerSession } from '@/lib/server-session';
  
 export async function POST(req: NextRequest) {
- const session = await getServerSession(authOptions);
+ const session = await getOptionalServerSession();
  if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+ if (!isRazorpayConfigured()) {
+   return NextResponse.json({ error: 'Billing is not configured' }, { status: 503 });
+ }
  
  const { planId }: { planId: 'scout' | 'navigator' | 'admiral' } = await req.json();
  if (!PLAN_IDS[planId]) return NextResponse.json({ error: 'Invalid plan' }, { status: 400 });

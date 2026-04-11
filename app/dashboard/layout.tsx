@@ -1,7 +1,6 @@
 import { Header } from "@/components/dashboard/Header"
 import { Sidebar } from "@/components/dashboard/Sidebar"
-import { authOptions } from "@/lib/auth-options"
-import { getServerSession } from "next-auth"
+import { getOptionalServerSession } from "@/lib/server-session"
 import { redirect } from "next/navigation"
 import { verifyAdminSessionToken, ADMIN_SESSION_COOKIE } from "@/lib/admin-auth"
 import { cookies } from "next/headers"
@@ -11,7 +10,7 @@ export default async function DashboardLayout({
 }: {
     children: React.ReactNode
 }) {
-    const session = await getServerSession(authOptions)
+    const session = await getOptionalServerSession()
     
     // Check for admin session fallback for testing/access
     const adminToken = cookies().get(ADMIN_SESSION_COOKIE)?.value

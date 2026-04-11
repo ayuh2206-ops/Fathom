@@ -4,12 +4,17 @@ import WebSocket from 'ws';
 export const dynamic = 'force-dynamic';
  
 export async function GET() {
+ const apiKey = process.env.AISSTREAM_API_KEY;
+ if (!apiKey) {
+   return NextResponse.json([]);
+ }
+
  const vessels = await new Promise<object[]>((resolve) => {
    const ws = new WebSocket('wss://stream.aisstream.io/v0/stream');
    const data: object[] = [];
    ws.on('open', () => {
      ws.send(JSON.stringify({
-       APIKey: process.env.AISSTREAM_API_KEY,
+       APIKey: apiKey,
        BoundingBoxes: [[[50, 10], [80, 30]]],
        FilterMessageTypes: ['PositionReport'],
      }));

@@ -13,14 +13,9 @@ type AdminSessionPayload = {
     v?: number
 }
 
-function getRequiredEnv(name: "ADMIN_PANEL_SECRET" | "ADMIN_USERNAME"): string {
+function getAdminEnv(name: "ADMIN_PANEL_SECRET" | "ADMIN_USERNAME"): string | null {
     const value = process.env[name]
-
-    if (!value) {
-        throw new Error(`Missing required environment variable: ${name}`)
-    }
-
-    return value
+    return typeof value === "string" && value.length > 0 ? value : null
 }
 
 function toBase64Url(bytes: Uint8Array): string {
@@ -80,8 +75,10 @@ async function createSignature(payload: string, secret: string): Promise<string>
 
 async function hasValidAdminSession(request: NextRequest): Promise<boolean> {
     const sessionToken = request.cookies.get(ADMIN_SESSION_COOKIE)?.value
+    const adminSecret = getAdminEnv("ADMIN_PANEL_SECRET")
+    const adminUsername = getAdminEnv("ADMIN_USERNAME")
 
-    if (!sessionToken) {
+    if (!sessionToken || !adminSecret || !adminUsername) {
         return false
     }
 
@@ -91,7 +88,7 @@ async function hasValidAdminSession(request: NextRequest): Promise<boolean> {
         return false
     }
 
-    const expectedSignature = await createSignature(encodedPayload, getRequiredEnv("ADMIN_PANEL_SECRET"))
+    const expectedSignature = await createSignature(encodedPayload, adminSecret)
     if (!safeEqual(providedSignature, expectedSignature)) {
         return false
     }
@@ -105,7 +102,7 @@ async function hasValidAdminSession(request: NextRequest): Promise<boolean> {
             return false
         }
 
-        if (payload.sub !== getRequiredEnv("ADMIN_USERNAME")) {
+        if (payload.sub !== adminUsername) {
             return false
         }
 

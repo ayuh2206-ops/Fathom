@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
+import { useEffect, useMemo, useState } from "react"
 import {
     LayoutDashboard,
     Ship,
@@ -35,6 +36,54 @@ const sidebarItems: NavItem[] = [
 
 export function Sidebar({ className }: { className?: string }) {
     const pathname = usePathname()
+    const [openAlertCount, setOpenAlertCount] = useState(0)
+
+    useEffect(() => {
+        let isCancelled = false
+
+        const loadAlerts = async () => {
+            try {
+                const response = await fetch("/api/alerts", { cache: "no-store" })
+                if (!response.ok) {
+                    return
+                }
+
+                const payload = (await response.json()) as {
+                    alerts?: Array<{ status?: string }>
+                }
+
+                if (!isCancelled) {
+                    setOpenAlertCount(
+                        (payload.alerts ?? []).filter((alert) => (alert.status ?? "open") === "open").length
+                    )
+                }
+            } catch {
+                if (!isCancelled) {
+                    setOpenAlertCount(0)
+                }
+            }
+        }
+
+        void loadAlerts()
+
+        return () => {
+            isCancelled = true
+        }
+    }, [])
+
+    const items = useMemo(
+        () =>
+            sidebarItems.map((item) =>
+                item.href === "/dashboard/alerts"
+                    ? {
+                        ...item,
+                        badge: openAlertCount > 0 ? openAlertCount : undefined,
+                        badgeColor: "bg-red-500/20 text-red-400",
+                    }
+                    : item
+            ),
+        [openAlertCount]
+    )
 
     return (
         <div className={cn("flex flex-col h-screen w-64 bg-slate-950 border-r border-white/10", className)}>
@@ -51,7 +100,7 @@ export function Sidebar({ className }: { className?: string }) {
 
             {/* Navigation */}
             <nav className="flex-1 px-4 space-y-1 py-2 overflow-y-auto">
-                {sidebarItems.map((item) => {
+                {items.map((item) => {
                     const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href))
                     return (
                         <Link
@@ -100,4 +149,3 @@ export function Sidebar({ className }: { className?: string }) {
         </div>
     )
 }
-

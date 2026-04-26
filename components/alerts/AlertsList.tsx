@@ -18,9 +18,12 @@ interface Alert {
     type: string
     entity: string
     date: string
-    status: 'open' | 'investigating' | 'resolved' | 'false_positive'
+    status: 'open' | 'investigating' | 'resolved' | 'false_positive' | string
     description: string
     evidence?: string
+    fraudScore?: number
+    invoiceId?: string
+    aisVerified?: boolean
 }
 
 interface AlertsListProps {
@@ -50,8 +53,10 @@ export function AlertsList({ alerts, onView }: AlertsListProps) {
                                     <Badge className="bg-red-500 text-white hover:bg-red-600 border-none animate-pulse">CRITICAL</Badge>
                                 ) : alert.severity === 'high' ? (
                                     <Badge variant="destructive" className="bg-orange-500/20 text-orange-400 border-orange-500/20">HIGH</Badge>
-                                ) : (
+                                ) : alert.severity === 'medium' ? (
                                     <Badge variant="outline" className="text-yellow-400 border-yellow-500/20">MEDIUM</Badge>
+                                ) : (
+                                    <Badge variant="outline" className="text-sky-400 border-sky-500/20">LOW</Badge>
                                 )}
                             </TableCell>
                             <TableCell className="font-medium text-white">
@@ -62,7 +67,7 @@ export function AlertsList({ alerts, onView }: AlertsListProps) {
                             </TableCell>
                             <TableCell>
                                 <div className="flex items-center gap-2 text-slate-300 font-mono text-xs">
-                                    {alert.entity.includes('INV') ? <FileText className="h-3 w-3 text-blue-400" /> : <Ship className="h-3 w-3 text-green-400" />}
+                                    {alert.invoiceId || alert.entity.includes('INV') ? <FileText className="h-3 w-3 text-blue-400" /> : <Ship className="h-3 w-3 text-green-400" />}
                                     {alert.entity}
                                 </div>
                             </TableCell>

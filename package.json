@@ -12,6 +12,7 @@
     "test:smoke": "node test_mvp.mjs"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.91.1",
     "@hookform/resolvers": "^5.2.2",
     "@radix-ui/react-avatar": "^1.1.11",
     "@radix-ui/react-checkbox": "^1.3.3",
@@ -42,7 +43,6 @@
     "mapbox-gl": "^3.19.0",
     "next": "14.2.35",
     "next-auth": "^4.24.13",
-    "openai": "^6.32.0",
     "pdf-lib": "^1.17.1",
     "pdf2pic": "^3.2.0",
     "razorpay": "^2.9.6",

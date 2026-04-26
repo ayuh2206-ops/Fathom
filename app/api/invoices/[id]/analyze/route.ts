@@ -6,8 +6,15 @@ import {
     extractInvoiceFields,
     generateDisputeDraft,
 } from "@/lib/ai/invoice-analyzer"
+import { getVesselAISData, type AISStreamResult } from "@/lib/ais-client"
+import {
+    findOrCreateAgent,
+    getAgentById,
+    updateAgentAfterAnalysis,
+} from "@/lib/agent-registry"
 import { admin, getFirebaseFirestore, getFirebaseStorage } from "@/lib/firebase-admin"
 import { getSignedInvoiceFileUrl } from "@/lib/invoices/file-url"
+import { getPortTariff } from "@/lib/port-tariffs"
 import { getOptionalServerSession } from "@/lib/server-session"
 import { Timestamp } from "firebase-admin/firestore"
 import { NextResponse } from "next/server"
@@ -61,6 +68,14 @@ type InvoiceDocument = {
         fraudResult: FraudAnalysisResult
         disputeDraft: DisputeDraft | null
     } | null
+    aisData?: AISStreamResult | null
+    agentId?: string | null
+    vesselIMO?: string | null
+    vesselMMSI?: string | null
+    portLocode?: string | null
+    agentName?: string | null
+    portTariffUsed?: string | null
+    totalDisputedAmount?: number | null
 }
 
 function toIso(value: unknown): string | null {
@@ -139,6 +154,8 @@ function serializeInvoice(doc: FirebaseFirestore.DocumentSnapshot, fileUrl: stri
         analysisError: data.analysisError ?? null,
         createdAt: toIso(data.createdAt) ?? new Date().toISOString(),
         aiAnalysis: data.aiAnalysis ?? null,
+        totalDisputedAmount: toNullableNumber(data.totalDisputedAmount),
+        aisData: data.aisData ?? null,
     }
 }
 
@@ -275,10 +292,18 @@ function hasUsableExtractedData(extractedFields: ExtractedInvoiceFields): boolea
         extractedFields.portOfLoading,
         extractedFields.portOfDischarge,
         extractedFields.vesselName,
+        extractedFields.vesselIMO,
+        extractedFields.vesselMMSI,
         extractedFields.billOfLadingNumber,
+        extractedFields.portLocode,
+        extractedFields.portName,
+        extractedFields.agentName,
+        extractedFields.agentEmail,
         extractedFields.detentionDays,
         extractedFields.demurrageDays,
         extractedFields.freeTimeDays,
+        extractedFields.arrivalDate,
+        extractedFields.departureDate,
     ].some((value) => value !== null) || extractedFields.lineItems.length > 0 || extractedFields.containerNumbers.length > 0
 }
 
@@ -340,11 +365,59 @@ export async function POST(_: Request, { params }: { params: { id: string } }) {
             session.user.organizationId,
             invoiceDoc.id
         )
-        const fraudResult = await analyzeForFraud(extractedFields, historicalContext)
+        const portTariff = extractedFields.portLocode
+            ? await getPortTariff(extractedFields.portLocode).catch(() => null)
+            : null
+
+        let aisData: AISStreamResult | null = null
+        if (extractedFields.vesselMMSI && extractedFields.portLocode) {
+            const dateFrom = extractedFields.arrivalDate
+                ? extractedFields.arrivalDate.split("T")[0]!
+                : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]!
+            const dateTo = extractedFields.departureDate
+                ? extractedFields.departureDate.split("T")[0]!
+                : new Date().toISOString().split("T")[0]!
+
+            aisData = await getVesselAISData(
+                extractedFields.vesselMMSI,
+                extractedFields.portLocode,
+                dateFrom,
+                dateTo
+            ).catch((err) => {
+                console.warn("AIS lookup failed:", err)
+                return null
+            })
+        }
+
+        let agentId: string | null = null
+        let agentHistory: any = null
+        agentId = await findOrCreateAgent({
+            agentName: extractedFields.agentName ?? null,
+            agentEmail: extractedFields.agentEmail ?? null,
+            agentPhone: extractedFields.agentPhone ?? null,
+            agentCompany: extractedFields.agentCompany ?? null,
+            portLocode: extractedFields.portLocode ?? null,
+        }).catch(() => null)
+
+        if (agentId) {
+            agentHistory = await getAgentById(agentId).catch(() => null)
+        }
+
+        const fraudResult = await analyzeForFraud(
+            extractedFields,
+            portTariff,
+            aisData,
+            agentHistory,
+            historicalContext
+        )
         const disputeDraft =
             fraudResult.recommendedAction === "dispute" || fraudResult.recommendedAction === "escalate"
                 ? await generateDisputeDraft(extractedFields, fraudResult, session.user.name || "FATHOM Operator")
                 : null
+
+        if (agentId) {
+            await updateAgentAfterAnalysis(agentId, fraudResult.fraudScore, fraudResult.flags.length).catch(() => {})
+        }
 
         const nextStatus: InvoiceStatus = fraudResult.fraudScore >= 61 ? "flagged" : "analyzed"
         const nextInvoiceNumber = extractedFields.invoiceNumber ?? getFallbackInvoiceNumber(invoiceDoc.id, invoiceData.invoiceNumber)
@@ -371,6 +444,14 @@ export async function POST(_: Request, { params }: { params: { id: string } }) {
                 disputeDraft,
                 analysisError: null,
                 mimeType,
+                aisData: aisData ?? null,
+                agentId: agentId ?? null,
+                vesselIMO: extractedFields.vesselIMO ?? null,
+                vesselMMSI: extractedFields.vesselMMSI ?? null,
+                portLocode: extractedFields.portLocode ?? null,
+                agentName: extractedFields.agentName ?? null,
+                portTariffUsed: portTariff ? String(portTariff.portName ?? extractedFields.portLocode ?? "") : null,
+                totalDisputedAmount: fraudResult.totalDisputedAmount ?? 0,
                 aiAnalysis: {
                     extractedFields,
                     fraudResult,
@@ -379,6 +460,34 @@ export async function POST(_: Request, { params }: { params: { id: string } }) {
             },
             { merge: true }
         )
+
+        if (fraudResult.fraudScore >= 61) {
+            try {
+                const alertRef = firestore.collection("alerts").doc()
+                await alertRef.set({
+                    type: "INVOICE_FRAUD_ALERT",
+                    invoiceId: params.id,
+                    organizationId: session.user.organizationId,
+                    vesselName: extractedFields.vesselName ?? "Unknown Vessel",
+                    vesselIMO: extractedFields.vesselIMO ?? null,
+                    portName: extractedFields.portName ?? extractedFields.portLocode ?? "Unknown Port",
+                    agentName: extractedFields.agentName ?? null,
+                    agentId: agentId ?? null,
+                    severity: fraudResult.fraudScore >= 80 ? "critical" : "high",
+                    status: "open",
+                    fraudScore: fraudResult.fraudScore,
+                    riskLevel: fraudResult.riskLevel,
+                    flagTypes: fraudResult.flags.map((flag) => flag.type),
+                    description: fraudResult.summary,
+                    aisVerified: aisData?.found ?? false,
+                    timestamp: new Date().toISOString(),
+                    invoiceAmount: extractedFields.totalAmount ?? 0,
+                    currency: extractedFields.currency ?? "USD",
+                })
+            } catch (alertError) {
+                console.warn("Failed to create fraud alert after invoice analysis:", alertError)
+            }
+        }
 
         const updatedDoc = await invoiceRef.get()
         const signedFileUrl = await getSignedFileUrl(invoiceData.filePath)

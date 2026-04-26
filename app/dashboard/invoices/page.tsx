@@ -72,9 +72,12 @@ export default function InvoicesPage() {
         void loadInvoices()
     }, [loadInvoices])
 
-    const handleUpload = useCallback(async (file: File) => {
+    const handleUpload = useCallback(async ({ file, vendorName }: { file: File; vendorName: string }) => {
         const formData = new FormData()
         formData.append("file", file)
+        if (vendorName.trim()) {
+            formData.append("vendor", vendorName.trim())
+        }
 
         const response = await fetch("/api/invoices", {
             method: "POST",

@@ -18,9 +18,12 @@ interface Alert {
     type: string
     entity: string
     date: string
-    status: 'open' | 'investigating' | 'resolved' | 'false_positive'
+    status: 'open' | 'investigating' | 'resolved' | 'false_positive' | string
     description: string
     evidence?: string
+    fraudScore?: number
+    invoiceId?: string
+    aisVerified?: boolean
 }
 
 interface AlertDetailSheetProps {
@@ -55,13 +58,32 @@ export function AlertDetailSheet({ alert, isOpen, onClose, onUpdateStatus }: Ale
                     {/* Entity Info */}
                     <div className="flex items-start gap-4 p-4 rounded-lg bg-white/5 border border-white/10">
                         <div className="p-2 bg-slate-900 rounded-lg">
-                            {alert.entity.includes('INV') ? <FileText className="h-6 w-6 text-blue-400" /> : <Ship className="h-6 w-6 text-green-400" />}
+                            {alert.invoiceId || alert.entity.includes('INV') ? <FileText className="h-6 w-6 text-blue-400" /> : <Ship className="h-6 w-6 text-green-400" />}
                         </div>
                         <div>
                             <p className="text-sm font-medium text-slate-400">Related Entity</p>
                             <p className="font-mono text-white text-lg">{alert.entity}</p>
+                            {alert.invoiceId && (
+                                <p className="text-xs text-slate-500 mt-1">Invoice ID: {alert.invoiceId}</p>
+                            )}
                         </div>
                     </div>
+
+                    {typeof alert.fraudScore === "number" && (
+                        <div className="rounded-lg border border-white/10 bg-slate-900/60 p-4">
+                            <p className="text-sm font-medium text-slate-400">Fraud Score</p>
+                            <p className="mt-1 text-2xl font-mono text-white">{alert.fraudScore}/100</p>
+                        </div>
+                    )}
+
+                    {typeof alert.aisVerified === "boolean" && (
+                        <div className="rounded-lg border border-white/10 bg-slate-900/60 p-4">
+                            <p className="text-sm font-medium text-slate-400">AIS Verification</p>
+                            <p className={`mt-1 text-sm font-medium ${alert.aisVerified ? "text-emerald-400" : "text-red-400"}`}>
+                                {alert.aisVerified ? "Vessel movement verified" : "AIS did not verify the claimed movement"}
+                            </p>
+                        </div>
+                    )}
 
                     {/* Description */}
                     <div className="space-y-2">

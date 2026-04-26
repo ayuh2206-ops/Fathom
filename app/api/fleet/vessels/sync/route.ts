@@ -1,6 +1,6 @@
+import { getDashboardAccessContext } from "@/lib/dashboard-access"
 import { fetchLiveFleetSnapshot } from "@/lib/fleet-live"
 import { getFirebaseFirestore } from "@/lib/firebase-admin"
-import { getOptionalServerSession } from "@/lib/server-session"
 import { FieldValue, Timestamp } from "firebase-admin/firestore"
 import { NextResponse } from "next/server"
 
@@ -76,9 +76,9 @@ function toFleetResponse(id: string, tracked: TrackedVesselDocument, vessel: Ves
 }
 
 export async function POST() {
-    const session = await getOptionalServerSession()
+    const access = await getDashboardAccessContext()
 
-    if (!session?.user?.id || !session.user.organizationId) {
+    if (!access) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
@@ -86,7 +86,7 @@ export async function POST() {
         const firestore = getFirebaseFirestore()
         const trackedSnapshot = await firestore
             .collection("trackedVessels")
-            .where("organizationId", "==", session.user.organizationId)
+            .where("organizationId", "==", access.organizationId)
             .get()
 
         if (trackedSnapshot.empty) {
@@ -104,7 +104,7 @@ export async function POST() {
                     await vesselRef.set(
                         {
                             id: trackedDoc.id,
-                            organizationId: session.user.organizationId,
+                            organizationId: access.organizationId,
                             name: existingVessel?.name ?? tracked.name,
                             mmsi: tracked.mmsi,
                             imo: tracked.imo,
@@ -143,7 +143,7 @@ export async function POST() {
                 await vesselRef.set(
                     {
                         id: trackedDoc.id,
-                        organizationId: session.user.organizationId,
+                        organizationId: access.organizationId,
                         mmsi: tracked.mmsi,
                         ...mergedVessel,
                         lastUpdated: FieldValue.serverTimestamp(),

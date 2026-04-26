@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic'
 import { FleetList } from "@/components/fleet/FleetList"
 import { AddVesselModal } from "@/components/fleet/AddVesselModal"
 import { Button } from "@/components/ui/button"
+import { toast } from "@/hooks/use-toast"
 import { Plus, List, Map as MapIcon, RefreshCw } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { FleetVessel } from "@/types/fleet"
@@ -20,19 +21,31 @@ export default function FleetPage() {
     const [view, setView] = useState("map")
     const [isAddModalOpen, setIsAddModalOpen] = useState(false)
     const [isRefreshing, setIsRefreshing] = useState(false)
+    const [fleetError, setFleetError] = useState<string | null>(null)
     const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+    const upsertVessel = (vessel: FleetVessel) => {
+        setVessels((current) =>
+            [...current.filter((entry) => entry.id !== vessel.id), vessel].sort((left, right) =>
+                left.name.localeCompare(right.name)
+            )
+        )
+    }
 
     const loadFleet = async () => {
         try {
             const res = await fetch("/api/fleet/vessels", { cache: "no-store" })
             if (!res.ok) {
-                throw new Error(`Failed to load fleet: ${res.status}`)
+                const data = await res.json().catch(() => null)
+                throw new Error(data?.error || `Failed to load fleet: ${res.status}`)
             }
 
             const data = await res.json()
             setVessels(Array.isArray(data.vessels) ? data.vessels : [])
+            setFleetError(null)
         } catch (error) {
             console.error("Failed to load tracked vessels:", error)
+            setFleetError(error instanceof Error ? error.message : "Failed to load tracked vessels")
         }
     }
 
@@ -45,13 +58,16 @@ export default function FleetPage() {
             })
 
             if (!res.ok) {
-                throw new Error(`Failed to sync fleet: ${res.status}`)
+                const data = await res.json().catch(() => null)
+                throw new Error(data?.error || `Failed to sync fleet: ${res.status}`)
             }
 
             const data = await res.json()
             setVessels(Array.isArray(data.vessels) ? data.vessels : [])
+            setFleetError(null)
         } catch (error) {
             console.error("Failed to sync tracked vessels:", error)
+            setFleetError(error instanceof Error ? error.message : "Failed to sync tracked vessels")
         } finally {
             setIsRefreshing(false)
         }
@@ -90,6 +106,12 @@ export default function FleetPage() {
                 </div>
             </div>
 
+            {fleetError && (
+                <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+                    {fleetError}
+                </div>
+            )}
+
             {/* Tabs / View Toggle */}
             <Tabs defaultValue="map" value={view} onValueChange={setView} className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -124,13 +146,33 @@ export default function FleetPage() {
                             body: JSON.stringify(vessel),
                         })
 
+                        const data = await res.json().catch(() => null)
+
                         if (!res.ok) {
-                            throw new Error(`Failed to create tracked vessel: ${res.status}`)
+                            throw new Error(data?.error || `Failed to create tracked vessel: ${res.status}`)
                         }
 
-                        await syncFleet()
+                        if (data?.vessel) {
+                            upsertVessel(data.vessel as FleetVessel)
+                            setFleetError(null)
+                        }
+
+                        toast({
+                            title: "Vessel added",
+                            description: `${vessel.name} is now being tracked.`,
+                        })
+
+                        void syncFleet()
                     } catch (error) {
                         console.error("Failed to add tracked vessel", error)
+                        const message =
+                            error instanceof Error ? error.message : "Failed to add tracked vessel"
+                        setFleetError(message)
+                        toast({
+                            variant: "destructive",
+                            title: "Could not add vessel",
+                            description: message,
+                        })
                         throw error
                     }
                 }}

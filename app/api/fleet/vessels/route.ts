@@ -1,5 +1,5 @@
+import { getDashboardAccessContext } from "@/lib/dashboard-access"
 import { getFirebaseFirestore } from "@/lib/firebase-admin"
-import { getOptionalServerSession } from "@/lib/server-session"
 import { FieldValue, Timestamp } from "firebase-admin/firestore"
 import { NextResponse } from "next/server"
 import { z } from "zod"
@@ -94,9 +94,9 @@ function toFleetVessel(id: string, tracked: TrackedVesselDocument, vessel: Vesse
 }
 
 export async function GET() {
-    const session = await getOptionalServerSession()
+    const access = await getDashboardAccessContext()
 
-    if (!session?.user?.id || !session.user.organizationId) {
+    if (!access) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
@@ -105,11 +105,11 @@ export async function GET() {
         const [trackedSnapshot, vesselSnapshot] = await Promise.all([
             firestore
                 .collection("trackedVessels")
-                .where("organizationId", "==", session.user.organizationId)
+                .where("organizationId", "==", access.organizationId)
                 .get(),
             firestore
                 .collection("vessels")
-                .where("organizationId", "==", session.user.organizationId)
+                .where("organizationId", "==", access.organizationId)
                 .get(),
         ])
 
@@ -129,9 +129,9 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-    const session = await getOptionalServerSession()
+    const access = await getDashboardAccessContext()
 
-    if (!session?.user?.id || !session.user.organizationId) {
+    if (!access) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
@@ -148,13 +148,13 @@ export async function POST(req: Request) {
 
         const firestore = getFirebaseFirestore()
         const mmsi = parsed.data.mmsi.trim()
-        const trackedVesselId = getTrackedVesselId(session.user.organizationId, mmsi)
+        const trackedVesselId = getTrackedVesselId(access.organizationId, mmsi)
         const trackedRef = firestore.collection("trackedVessels").doc(trackedVesselId)
         const vesselRef = firestore.collection("vessels").doc(trackedVesselId)
 
         const trackedPayload: TrackedVesselDocument = {
-            organizationId: session.user.organizationId,
-            createdBy: session.user.id,
+            organizationId: access.organizationId,
+            createdBy: access.userId,
             name: parsed.data.name.trim(),
             mmsi,
             imo: parsed.data.imo?.trim() || null,
@@ -173,7 +173,7 @@ export async function POST(req: Request) {
         await vesselRef.set(
             {
                 id: trackedVesselId,
-                organizationId: session.user.organizationId,
+                organizationId: access.organizationId,
                 name: trackedPayload.name,
                 mmsi,
                 imo: trackedPayload.imo,

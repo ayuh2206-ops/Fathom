@@ -1,6 +1,7 @@
 import { getDashboardAccessContext } from "@/lib/dashboard-access"
 import { fetchLiveFleetSnapshot } from "@/lib/fleet-live"
 import { getFirebaseFirestore } from "@/lib/firebase-admin"
+import { fetchSeededVesselPosition, type VesselPositionSeedSource } from "@/lib/vessel-api"
 import { FieldValue, Timestamp } from "firebase-admin/firestore"
 import { NextResponse } from "next/server"
 
@@ -18,6 +19,7 @@ type TrackedVesselDocument = {
 
 type VesselDocument = {
     name?: string
+    mmsi?: string
     imo?: string | null
     type?: string
     lat?: number | null
@@ -28,8 +30,13 @@ type VesselDocument = {
     nextPort?: string | null
     eta?: string | null
     lastUpdated?: Timestamp | string | Date | null
-    source?: "aisstream" | "manual"
+    source?: "aisstream" | "manual" | "vesselapi"
+    positionSeedSource?: VesselPositionSeedSource | null
+    positionSeedError?: string | null
+    positionSeedAttemptedAt?: Timestamp | string | Date | null
 }
+
+const POSITION_SEED_RETRY_INTERVAL_MS = 1000 * 60 * 60 * 12
 
 function toIso(value: unknown): string | null {
     if (!value) {
@@ -49,6 +56,41 @@ function toIso(value: unknown): string | null {
     }
 
     return null
+}
+
+function toMillis(value: unknown): number | null {
+    if (!value) {
+        return null
+    }
+
+    if (value instanceof Timestamp) {
+        return value.toMillis()
+    }
+
+    if (value instanceof Date) {
+        return value.getTime()
+    }
+
+    if (typeof value === "string") {
+        const parsed = new Date(value).getTime()
+        return Number.isNaN(parsed) ? null : parsed
+    }
+
+    return null
+}
+
+function hasCoordinates(vessel: VesselDocument | undefined): boolean {
+    return typeof vessel?.lat === "number" && typeof vessel?.lng === "number"
+}
+
+function shouldAttemptSeed(vessel: VesselDocument | undefined): boolean {
+    if (hasCoordinates(vessel)) {
+        return false
+    }
+
+    const lastAttempt = toMillis(vessel?.positionSeedAttemptedAt)
+
+    return !lastAttempt || Date.now() - lastAttempt >= POSITION_SEED_RETRY_INTERVAL_MS
 }
 
 function toFleetResponse(id: string, tracked: TrackedVesselDocument, vessel: VesselDocument | undefined) {
@@ -97,10 +139,70 @@ export async function POST() {
             trackedSnapshot.docs.map(async (trackedDoc) => {
                 const tracked = trackedDoc.data() as TrackedVesselDocument
                 const vesselRef = firestore.collection("vessels").doc(trackedDoc.id)
-                const existingVessel = (await vesselRef.get()).data() as VesselDocument | undefined
+                let existingVessel = (await vesselRef.get()).data() as VesselDocument | undefined
                 const snapshot = await fetchLiveFleetSnapshot(tracked.mmsi)
 
                 if (!snapshot) {
+                    if (shouldAttemptSeed(existingVessel)) {
+                        const seedLookup = await fetchSeededVesselPosition({
+                            mmsi: tracked.mmsi,
+                            imo: tracked.imo,
+                        })
+
+                        const seededPosition = seedLookup.position
+
+                        await vesselRef.set(
+                            {
+                                id: trackedDoc.id,
+                                organizationId: access.organizationId,
+                                name: existingVessel?.name ?? tracked.name,
+                                mmsi: tracked.mmsi,
+                                imo: tracked.imo,
+                                type: tracked.type,
+                                lat: seededPosition?.latitude ?? existingVessel?.lat ?? null,
+                                lng: seededPosition?.longitude ?? existingVessel?.lng ?? null,
+                                heading: seededPosition?.heading ?? existingVessel?.heading ?? 0,
+                                speed: seededPosition?.speed ?? existingVessel?.speed ?? 0,
+                                status: existingVessel?.status ?? "unknown",
+                                nextPort: existingVessel?.nextPort ?? "Unknown",
+                                eta: existingVessel?.eta ?? "Unavailable",
+                                lastUpdated:
+                                    seededPosition?.lastUpdated ??
+                                    existingVessel?.lastUpdated ??
+                                    FieldValue.serverTimestamp(),
+                                source: seededPosition ? "vesselapi" : existingVessel?.source ?? "manual",
+                                positionSeedSource: seedLookup.source,
+                                positionSeedError: seedLookup.reason,
+                                positionSeedAttemptedAt: FieldValue.serverTimestamp(),
+                                updatedAt: FieldValue.serverTimestamp(),
+                            },
+                            { merge: true }
+                        )
+
+                        existingVessel = {
+                            ...existingVessel,
+                            name: existingVessel?.name ?? tracked.name,
+                            mmsi: tracked.mmsi,
+                            imo: tracked.imo,
+                            type: tracked.type,
+                            lat: seededPosition?.latitude ?? existingVessel?.lat ?? null,
+                            lng: seededPosition?.longitude ?? existingVessel?.lng ?? null,
+                            heading: seededPosition?.heading ?? existingVessel?.heading ?? 0,
+                            speed: seededPosition?.speed ?? existingVessel?.speed ?? 0,
+                            status: existingVessel?.status ?? "unknown",
+                            nextPort: existingVessel?.nextPort ?? "Unknown",
+                            eta: existingVessel?.eta ?? "Unavailable",
+                            lastUpdated:
+                                seededPosition?.lastUpdated ??
+                                toIso(existingVessel?.lastUpdated) ??
+                                new Date().toISOString(),
+                            source: seededPosition ? "vesselapi" : existingVessel?.source ?? "manual",
+                            positionSeedSource: seedLookup.source,
+                            positionSeedError: seedLookup.reason,
+                            positionSeedAttemptedAt: new Date(),
+                        }
+                    }
+
                     await vesselRef.set(
                         {
                             id: trackedDoc.id,

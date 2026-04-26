@@ -1,6 +1,6 @@
 import { getDashboardAccessContext } from "@/lib/dashboard-access"
 import { getFirebaseFirestore } from "@/lib/firebase-admin"
-import { fetchSeededVesselPosition } from "@/lib/vessel-api"
+import { fetchSeededVesselPosition, type VesselPositionSeedSource } from "@/lib/vessel-api"
 import { FieldValue, Timestamp } from "firebase-admin/firestore"
 import { NextResponse } from "next/server"
 import { z } from "zod"
@@ -31,7 +31,10 @@ type VesselDocument = {
     nextPort?: string | null
     eta?: string | null
     lastUpdated?: Timestamp | string | Date | null
-    source?: "aisstream" | "manual"
+    source?: "aisstream" | "manual" | "vesselapi"
+    positionSeedSource?: VesselPositionSeedSource | null
+    positionSeedError?: string | null
+    positionSeedAttemptedAt?: Timestamp | string | Date | null
 }
 
 const createTrackedVesselSchema = z.object({
@@ -149,7 +152,11 @@ export async function POST(req: Request) {
 
         const firestore = getFirebaseFirestore()
         const mmsi = parsed.data.mmsi.trim()
-        const seededPosition = await fetchSeededVesselPosition(mmsi)
+        const positionLookup = await fetchSeededVesselPosition({
+            mmsi,
+            imo: parsed.data.imo?.trim() || null,
+        })
+        const seededPosition = positionLookup.position
         const trackedVesselId = getTrackedVesselId(access.organizationId, mmsi)
         const trackedRef = firestore.collection("trackedVessels").doc(trackedVesselId)
         const vesselRef = firestore.collection("vessels").doc(trackedVesselId)
@@ -172,6 +179,12 @@ export async function POST(req: Request) {
             { merge: true }
         )
 
+        if (!seededPosition && positionLookup.reason) {
+            console.warn(
+                `[fleet/vessels] Seed position unavailable for ${trackedPayload.name} (${mmsi}): ${positionLookup.reason}`
+            )
+        }
+
         await vesselRef.set(
             {
                 id: trackedVesselId,
@@ -188,7 +201,10 @@ export async function POST(req: Request) {
                 nextPort: "Unknown",
                 eta: "Unavailable",
                 lastUpdated: seededPosition?.lastUpdated ?? FieldValue.serverTimestamp(),
-                source: "manual",
+                source: seededPosition ? "vesselapi" : "manual",
+                positionSeedSource: positionLookup.source,
+                positionSeedError: positionLookup.reason,
+                positionSeedAttemptedAt: FieldValue.serverTimestamp(),
             },
             { merge: true }
         )
@@ -208,8 +224,13 @@ export async function POST(req: Request) {
                     nextPort: "Unknown",
                     eta: "Unavailable",
                     lastUpdated: seededPosition?.lastUpdated ?? new Date(),
-                    source: "manual",
+                    source: seededPosition ? "vesselapi" : "manual",
+                    positionSeedSource: positionLookup.source,
+                    positionSeedError: positionLookup.reason,
+                    positionSeedAttemptedAt: new Date(),
                 }),
+                positionSeedSource: positionLookup.source,
+                positionSeedError: positionLookup.reason,
             },
             { status: 201 }
         )

@@ -14,5 +14,5 @@ export type FleetVessel = {
     nextPort: string
     eta: string
     lastUpdated: string | null
-    source: "aisstream" | "manual"
+    source: "aisstream" | "manual" | "vesselapi"
 }

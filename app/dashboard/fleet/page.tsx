@@ -162,6 +162,13 @@ export default function FleetPage() {
                             description: `${vessel.name} is now being tracked.`,
                         })
 
+                        if (data?.positionSeedError) {
+                            toast({
+                                title: "Position not seeded",
+                                description: String(data.positionSeedError),
+                            })
+                        }
+
                         void syncFleet()
                     } catch (error) {
                         console.error("Failed to add tracked vessel", error)

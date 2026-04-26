@@ -645,9 +645,9 @@ export async function extractInvoiceFields(fileBuffer: Buffer, mimeType: string)
 
 export async function analyzeForFraud(
     extractedFields: ExtractedInvoiceFields,
-    portTariff: any | null,
-    aisData: any | null,
-    agentHistory: any | null,
+    portTariff: unknown | null,
+    aisData: unknown | null,
+    agentHistory: unknown | null,
     historicalContext: FraudHistoricalContext
 ): Promise<FraudAnalysisResult> {
     const flags: FraudAnalysisResult["flags"] = []

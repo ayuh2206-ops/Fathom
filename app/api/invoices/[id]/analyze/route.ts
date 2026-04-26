@@ -390,7 +390,7 @@ export async function POST(_: Request, { params }: { params: { id: string } }) {
         }
 
         let agentId: string | null = null
-        let agentHistory: any = null
+        let agentHistory: unknown = null
         agentId = await findOrCreateAgent({
             agentName: extractedFields.agentName ?? null,
             agentEmail: extractedFields.agentEmail ?? null,

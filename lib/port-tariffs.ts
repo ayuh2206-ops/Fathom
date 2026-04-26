@@ -171,7 +171,7 @@ const PORT_TARIFFS = {
     },
 } as const
 
-export async function getPortTariff(portLocode: string): Promise<any | null> {
+export async function getPortTariff(portLocode: string): Promise<unknown | null> {
     try {
         const firestore = getFirebaseFirestore()
         const doc = await firestore.collection("portTariffs").doc(portLocode.toUpperCase()).get()

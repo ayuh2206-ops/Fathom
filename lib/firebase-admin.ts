@@ -5,6 +5,48 @@ import { getStorage } from "firebase-admin/storage"
 let _app: App | null = null
 let _initError: string | null = null
 
+function stripWrappingQuotes(value: string): string {
+    const trimmed = value.trim()
+
+    if (
+        (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+        (trimmed.startsWith("'") && trimmed.endsWith("'"))
+    ) {
+        return trimmed.slice(1, -1)
+    }
+
+    return trimmed
+}
+
+function decodeBase64Pem(value: string): string {
+    const normalized = value.replace(/\s+/g, "")
+
+    if (!normalized || normalized.length % 4 !== 0 || !/^[A-Za-z0-9+/=]+$/.test(normalized)) {
+        return value
+    }
+
+    const decoded = Buffer.from(normalized, "base64").toString("utf-8").trim()
+
+    return decoded.includes("-----BEGIN PRIVATE KEY-----") ? decoded : value
+}
+
+function normalizePrivateKey(value: string | undefined): string | undefined {
+    if (!value) {
+        return value
+    }
+
+    let normalized = stripWrappingQuotes(value)
+
+    // Support envs copied from JSON or Vercel, which often escape newlines.
+    normalized = normalized.replace(/\r\n/g, "\n").replace(/\\n/g, "\n").trim()
+
+    if (!normalized.startsWith("-----BEGIN PRIVATE KEY-----")) {
+        normalized = decodeBase64Pem(normalized)
+    }
+
+    return stripWrappingQuotes(normalized).replace(/\r\n/g, "\n").replace(/\\n/g, "\n").trim()
+}
+
 function getFirebaseAdminApp(): App {
     // Return cached app if already initialised
     if (_app) return _app
@@ -20,19 +62,7 @@ function getFirebaseAdminApp(): App {
 
     const projectId = process.env.FIREBASE_PROJECT_ID
     const clientEmail = process.env.FIREBASE_CLIENT_EMAIL
-    let privateKey = process.env.FIREBASE_PRIVATE_KEY
-
-    // If the key doesn't start with the PEM header, assume it's base64 encoded
-    if (privateKey && !privateKey.startsWith("-----BEGIN PRIVATE KEY-----")) {
-        try {
-            privateKey = Buffer.from(privateKey, "base64").toString("utf-8")
-        } catch {
-            console.warn("Failed to decode base64 FIREBASE_PRIVATE_KEY")
-        }
-    }
-
-    // Replace escaped newlines from env var string formats
-    privateKey = privateKey?.replace(/\\n/g, "\n")
+    const privateKey = normalizePrivateKey(process.env.FIREBASE_PRIVATE_KEY)
 
     const storageBucket = process.env.FIREBASE_STORAGE_BUCKET
 

@@ -6,35 +6,25 @@ import 'mapbox-gl/dist/mapbox-gl.css'
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Anchor, Navigation, Map as MapIcon } from "lucide-react"
+import type { FleetVessel } from "@/types/fleet"
 
 // Ensure access token is set in .env.local
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
 
-interface Vessel {
-    id: string
-    name: string
-    imo: string
-    lat: number
-    lng: number
-    heading: number
-    speed: number
-    status: 'moving' | 'anchored' | 'moored'
-    nextPort: string
-    eta: string
-}
-
 interface FleetMapProps {
-    vessels: Vessel[]
+    vessels: FleetVessel[]
 }
 
 export default function FleetMap({ vessels }: FleetMapProps) {
-    const [popupInfo, setPopupInfo] = useState<Vessel | null>(null)
+    const [popupInfo, setPopupInfo] = useState<FleetVessel | null>(null)
 
-    const markers = useMemo(() => vessels.map(vessel => (
+    const markers = useMemo(() => vessels
+        .filter((vessel) => Number.isFinite(vessel.lat) && Number.isFinite(vessel.lng))
+        .map(vessel => (
         <Marker
             key={vessel.id}
-            longitude={vessel.lng}
-            latitude={vessel.lat}
+            longitude={vessel.lng ?? 0}
+            latitude={vessel.lat ?? 0}
             anchor="center"
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             onClick={(e: any) => {
@@ -92,8 +82,8 @@ export default function FleetMap({ vessels }: FleetMapProps) {
 
                 {popupInfo && (
                     <Popup
-                        longitude={popupInfo.lng}
-                        latitude={popupInfo.lat}
+                        longitude={popupInfo.lng ?? 0}
+                        latitude={popupInfo.lat ?? 0}
                         anchor="bottom"
                         onClose={() => setPopupInfo(null)}
                         closeButton={false}

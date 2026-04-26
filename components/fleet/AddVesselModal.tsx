@@ -6,47 +6,45 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useState } from "react"
+
 interface AddVesselModalProps {
     isOpen: boolean
     onClose: () => void
-    onAdd: (vessel: { id: string; name: string; imo: string; type: string; lat: number; lng: number; heading: number; speed: number; status: 'moving' | 'anchored' | 'moored'; nextPort: string; eta: string }) => void
+    onAdd: (vessel: { name: string; mmsi: string; imo: string; type: string }) => Promise<void> | void
 }
 
 export function AddVesselModal({ isOpen, onClose, onAdd }: AddVesselModalProps) {
     const [isLoading, setIsLoading] = useState(false)
     const [formData, setFormData] = useState({
         name: "",
+        mmsi: "",
         imo: "",
-        type: "container"
+        type: "container",
     })
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setIsLoading(true)
-        // Simulate API call
-        setTimeout(() => {
-            const newVessel = {
-                id: Math.random().toString(36).substr(2, 9),
-                ...formData,
-                lat: 20 + Math.random() * 10,
-                lng: -30 + Math.random() * 60,
-                heading: Math.floor(Math.random() * 360),
-                speed: 14.5,
-                status: 'moving' as const,
-                nextPort: 'Rotterdam',
-                eta: '2024-02-15 08:00'
-            }
-            onAdd(newVessel)
+        try {
+            await onAdd({
+                name: formData.name.trim(),
+                mmsi: formData.mmsi.trim(),
+                imo: formData.imo.trim(),
+                type: formData.type,
+            })
             setIsLoading(false)
             onClose()
-            setFormData({ name: "", imo: "", type: "container" })
-        }, 1000)
+            setFormData({ name: "", mmsi: "", imo: "", type: "container" })
+        } catch (error) {
+            console.error("Failed to add tracked vessel", error)
+            setIsLoading(false)
+        }
     }
 
     return (
         <Modal
             title="Add New Vessel"
-            description="Register a vessel to your fleet for tracking."
+            description="Register a vessel for live tracking. MMSI is required for the AISStream lookup."
             isOpen={isOpen}
             onClose={onClose}
         >
@@ -63,15 +61,30 @@ export function AddVesselModal({ isOpen, onClose, onAdd }: AddVesselModalProps) 
                     />
                 </div>
                 <div className="space-y-2">
+                    <Label htmlFor="mmsi">MMSI Number</Label>
+                    <Input
+                        id="mmsi"
+                        placeholder="123456789"
+                        required
+                        inputMode="numeric"
+                        pattern="[0-9]{9}"
+                        maxLength={9}
+                        className="bg-slate-900 border-white/10 font-mono"
+                        value={formData.mmsi}
+                        onChange={e => setFormData({ ...formData, mmsi: e.target.value.replace(/\D/g, "") })}
+                    />
+                </div>
+                <div className="space-y-2">
                     <Label htmlFor="imo">IMO Number</Label>
                     <Input
                         id="imo"
                         placeholder="9811000"
-                        required
+                        inputMode="numeric"
+                        pattern="[0-9]{7}"
                         maxLength={7}
                         className="bg-slate-900 border-white/10 font-mono"
                         value={formData.imo}
-                        onChange={e => setFormData({ ...formData, imo: e.target.value })}
+                        onChange={e => setFormData({ ...formData, imo: e.target.value.replace(/\D/g, "") })}
                     />
                 </div>
                 <div className="space-y-2">

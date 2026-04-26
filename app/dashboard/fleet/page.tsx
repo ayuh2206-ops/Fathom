@@ -1,14 +1,13 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useEffect, useRef, useState } from "react"
 import dynamic from 'next/dynamic'
-import { collection, onSnapshot } from "firebase/firestore"
-import { db, hasClientConfig } from "@/lib/firebase"
 import { FleetList } from "@/components/fleet/FleetList"
 import { AddVesselModal } from "@/components/fleet/AddVesselModal"
 import { Button } from "@/components/ui/button"
 import { Plus, List, Map as MapIcon, RefreshCw } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import type { FleetVessel } from "@/types/fleet"
 
 // Dynamically import Map to disable SSR
 const FleetMap = dynamic(() => import('@/components/fleet/FleetMap'), {
@@ -16,60 +15,59 @@ const FleetMap = dynamic(() => import('@/components/fleet/FleetMap'), {
     loading: () => <div className="h-[600px] w-full bg-slate-900 animate-pulse rounded-lg flex items-center justify-center text-slate-500">Loading Map...</div>
 })
 
-export interface FleetVessel {
-    id: string;
-    name: string;
-    imo: string;
-    lat: number;
-    lng: number;
-    heading: number;
-    speed: number;
-    status: 'moving' | 'anchored' | 'moored';
-    nextPort: string;
-    eta: string;
-}
-
-// No longer need hardcoded mock data here, we will fetch it!
-
 export default function FleetPage() {
     const [vessels, setVessels] = useState<FleetVessel[]>([])
     const [view, setView] = useState("map")
     const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+    const [isRefreshing, setIsRefreshing] = useState(false)
+    const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-    // Simulation loop fetching from our Mock API OR Firestore Sync
-    useEffect(() => {
-        if (hasClientConfig && db) {
-            // PHASE 3: REAL-TIME FIRESTORE SYNC
-            // Listen to the 'vessels' collection for instant updates pushed by the Cloud Function
-            const unsubscribe = onSnapshot(collection(db, "vessels"), (snapshot) => {
-                const liveVessels: FleetVessel[] = [];
-                snapshot.forEach((doc) => {
-                    liveVessels.push({ id: doc.id, ...doc.data() } as FleetVessel);
-                });
-                setVessels(liveVessels);
-            }, (error) => {
-                console.error("Firestore onSnapshot error:", error);
-            });
-
-            return () => unsubscribe();
-        } else {
-            // FALLBACK: If Firebase Client SDK isn't configured, fallback to polling the Mock API
-            const fetchFleet = async () => {
-                try {
-                    const res = await fetch('/api/mock/fleet')
-                    if (res.ok) {
-                        const data = await res.json()
-                        setVessels(data.vessels)
-                    }
-                } catch (error) {
-                    console.error("Failed to fetch mock fleet:", error)
-                }
+    const loadFleet = async () => {
+        try {
+            const res = await fetch("/api/fleet/vessels", { cache: "no-store" })
+            if (!res.ok) {
+                throw new Error(`Failed to load fleet: ${res.status}`)
             }
 
-            fetchFleet() // initial fetch
-            const interval = setInterval(fetchFleet, 2000) // Update every 2 seconds from the server
+            const data = await res.json()
+            setVessels(Array.isArray(data.vessels) ? data.vessels : [])
+        } catch (error) {
+            console.error("Failed to load tracked vessels:", error)
+        }
+    }
 
-            return () => clearInterval(interval)
+    const syncFleet = async () => {
+        try {
+            setIsRefreshing(true)
+            const res = await fetch("/api/fleet/vessels/sync", {
+                method: "POST",
+                cache: "no-store",
+            })
+
+            if (!res.ok) {
+                throw new Error(`Failed to sync fleet: ${res.status}`)
+            }
+
+            const data = await res.json()
+            setVessels(Array.isArray(data.vessels) ? data.vessels : [])
+        } catch (error) {
+            console.error("Failed to sync tracked vessels:", error)
+        } finally {
+            setIsRefreshing(false)
+        }
+    }
+
+    useEffect(() => {
+        void loadFleet().then(() => syncFleet())
+
+        intervalRef.current = setInterval(() => {
+            void syncFleet()
+        }, 30000)
+
+        return () => {
+            if (intervalRef.current) {
+                clearInterval(intervalRef.current)
+            }
         }
     }, [])
 
@@ -81,9 +79,9 @@ export default function FleetPage() {
                     <p className="text-slate-400">Track and manage your vessels in real-time.</p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <Button variant="outline" className="border-white/10 text-white hover:bg-white/5" onClick={() => window.location.reload()}>
-                        <RefreshCw className="h-4 w-4 mr-2" />
-                        Refresh
+                    <Button variant="outline" className="border-white/10 text-white hover:bg-white/5" onClick={() => void syncFleet()}>
+                        <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`} />
+                        {isRefreshing ? "Refreshing..." : "Refresh"}
                     </Button>
                     <Button className="bg-ocean text-white hover:bg-ocean-dark" onClick={() => setIsAddModalOpen(true)}>
                         <Plus className="h-4 w-4 mr-2" />
@@ -119,24 +117,21 @@ export default function FleetPage() {
                 isOpen={isAddModalOpen}
                 onClose={() => setIsAddModalOpen(false)}
                 onAdd={async (vessel) => {
-                    if (hasClientConfig && db) {
-                        try {
-                            const { doc, setDoc } = await import("firebase/firestore");
-                            await setDoc(doc(db, "vessels", vessel.id), vessel);
-                        } catch (e) {
-                            console.error("Failed to add ship to live Firestore map", e);
+                    try {
+                        const res = await fetch("/api/fleet/vessels", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify(vessel),
+                        })
+
+                        if (!res.ok) {
+                            throw new Error(`Failed to create tracked vessel: ${res.status}`)
                         }
-                    } else {
-                        try {
-                            await fetch('/api/mock/fleet', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify(vessel)
-                            });
-                            // The 2-second poller will automatically grab the new ship
-                        } catch (e) {
-                            console.error("Failed to add ship to mock simulation", e);
-                        }
+
+                        await syncFleet()
+                    } catch (error) {
+                        console.error("Failed to add tracked vessel", error)
+                        throw error
                     }
                 }}
             />

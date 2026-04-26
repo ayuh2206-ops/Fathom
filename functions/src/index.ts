@@ -169,20 +169,14 @@ const COMPILED_HIGH_RISK_ZONES: CompiledRiskZone[] = HIGH_RISK_ZONES.map((zone) 
  */
 export const ingestFleetData = onSchedule("every 5 minutes", async () => {
     try {
-        console.log("[FATHOM Ingestion] Starting fleet sync and risk evaluation.");
+        console.log("[FATHOM Ingestion] Starting fleet risk evaluation from Firestore.");
 
-        const AIS_API_URL = process.env.NEXTAUTH_URL
-            ? `${process.env.NEXTAUTH_URL}/api/mock/fleet`
-            : "http://127.0.0.1:3000/api/mock/fleet";
-
-        const response = await fetch(AIS_API_URL);
-        if (!response.ok) {
-            throw new Error(`Failed to fetch AIS data: ${response.status} ${response.statusText}`);
-        }
-
-        const payload = await response.json();
-        const vessels = Array.isArray(payload?.vessels) ? (payload.vessels as FleetVessel[]) : [];
-        console.log(`[FATHOM Ingestion] Extracted ${vessels.length} vessel records.`);
+        const vesselSnapshot = await db.collection("vessels").get();
+        const vessels = vesselSnapshot.docs.map((doc) => ({
+            ...(doc.data() as FleetVessel),
+            id: doc.id,
+        }))
+        console.log(`[FATHOM Ingestion] Loaded ${vessels.length} vessel records from Firestore.`);
 
         if (vessels.length === 0) {
             return;

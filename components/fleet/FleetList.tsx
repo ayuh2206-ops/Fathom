@@ -11,22 +11,10 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ArrowUpRight } from "lucide-react"
-
-interface Vessel {
-    id: string
-    name: string
-    imo: string
-    lat: number
-    lng: number
-    heading: number
-    speed: number
-    status: 'moving' | 'anchored' | 'moored'
-    nextPort: string
-    eta: string
-}
+import type { FleetVessel } from "@/types/fleet"
 
 interface FleetListProps {
-    vessels: Vessel[]
+    vessels: FleetVessel[]
     onViewDetails: (id: string) => void
 }
 
@@ -49,14 +37,15 @@ export function FleetList({ vessels, onViewDetails }: FleetListProps) {
                     {vessels.map((vessel) => (
                         <TableRow key={vessel.id} className="border-white/10 hover:bg-white/5">
                             <TableCell className="font-medium text-white">{vessel.name}</TableCell>
-                            <TableCell className="font-mono text-slate-400">{vessel.imo}</TableCell>
+                            <TableCell className="font-mono text-slate-400">{vessel.imo || "-"}</TableCell>
                             <TableCell>
                                 <Badge
                                     variant={vessel.status === 'moving' ? 'default' : 'secondary'}
                                     className={
                                         vessel.status === 'moving' ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30' :
                                             vessel.status === 'anchored' ? 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30' :
-                                                'bg-slate-500/20 text-slate-400'
+                                                vessel.status === 'moored' ? 'bg-slate-500/20 text-slate-400' :
+                                                    'bg-white/10 text-slate-300'
                                     }
                                 >
                                     {vessel.status}

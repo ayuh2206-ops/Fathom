@@ -40,6 +40,18 @@ type VesselApiPayload =
       }
     | null
 
+type VesselPositionsPayload =
+    | {
+          vesselPositions?: Array<Record<string, unknown>>
+          data?: Array<Record<string, unknown>>
+          error?: {
+              message?: unknown
+          }
+          message?: unknown
+          detail?: unknown
+      }
+    | null
+
 function asNumber(value: unknown): number | null {
     if (typeof value === "number" && Number.isFinite(value)) {
         return value
@@ -113,40 +125,165 @@ function getErrorMessage(payload: VesselApiPayload, status: number): string {
     )
 }
 
-async function fetchByIdentifier(
+function getErrorMessageFromListPayload(payload: VesselPositionsPayload, status: number): string {
+    return (
+        asString(payload?.error?.message) ??
+        asString(payload?.message) ??
+        asString(payload?.detail) ??
+        `VesselAPI responded with status ${status}`
+    )
+}
+
+async function fetchJson<T>(url: string): Promise<{ ok: boolean; status: number; payload: T | null }> {
+    const response = await fetch(url, {
+        headers: {
+            Authorization: `Bearer ${process.env.VESSEL_API_KEY}`,
+        },
+        cache: "no-store",
+        signal: AbortSignal.timeout(10000),
+    })
+
+    return {
+        ok: response.ok,
+        status: response.status,
+        payload: (await response.json().catch(() => null)) as T | null,
+    }
+}
+
+async function fetchLatestPositionByIdentifier(
     identifier: string,
     idType: VesselPositionSeedSource
 ): Promise<{ position: SeededVesselPosition | null; reason: string | null }> {
-    const response = await fetch(
-        `https://api.vesselapi.com/v1/vessel/${encodeURIComponent(identifier)}/position?filter.idType=${idType}`,
-        {
-            headers: {
-                Authorization: `Bearer ${process.env.VESSEL_API_KEY}`,
-            },
-            cache: "no-store",
-            signal: AbortSignal.timeout(10000),
-        }
+    const response = await fetchJson<VesselApiPayload>(
+        `https://api.vesselapi.com/v1/vessel/${encodeURIComponent(identifier)}/position?filter.idType=${idType}`
     )
-
-    const payload = (await response.json().catch(() => null)) as VesselApiPayload
 
     if (!response.ok) {
         return {
             position: null,
-            reason: `${idType.toUpperCase()} lookup failed: ${getErrorMessage(payload, response.status)}`,
+            reason: `${idType.toUpperCase()} latest-position lookup failed: ${getErrorMessage(
+                response.payload,
+                response.status
+            )}`,
         }
     }
 
-    const position = parsePosition(payload)
+    const position = parsePosition(response.payload)
 
     if (!position) {
         return {
             position: null,
-            reason: `${idType.toUpperCase()} lookup returned no coordinates`,
+            reason: `${idType.toUpperCase()} latest-position lookup returned no coordinates`,
         }
     }
 
     return { position, reason: null }
+}
+
+async function fetchHistoricalPositionByIdentifier(
+    identifier: string,
+    idType: VesselPositionSeedSource
+): Promise<{ position: SeededVesselPosition | null; reason: string | null }> {
+    const now = new Date()
+    const from = new Date(now.getTime() - 1000 * 60 * 60 * 24 * 30)
+    const params = new URLSearchParams({
+        "filter.ids": identifier,
+        "filter.idType": idType,
+        "time.from": from.toISOString(),
+        "time.to": now.toISOString(),
+        "pagination.limit": "1",
+    })
+
+    const response = await fetchJson<VesselPositionsPayload>(
+        `https://api.vesselapi.com/v1/vessels/positions?${params.toString()}`
+    )
+
+    if (!response.ok) {
+        return {
+            position: null,
+            reason: `${idType.toUpperCase()} historical-position lookup failed: ${getErrorMessageFromListPayload(
+                response.payload,
+                response.status
+            )}`,
+        }
+    }
+
+    const firstPosition =
+        Array.isArray(response.payload?.vesselPositions) && response.payload.vesselPositions.length > 0
+            ? response.payload.vesselPositions[0]
+            : Array.isArray(response.payload?.data) && response.payload.data.length > 0
+              ? response.payload.data[0]
+              : null
+
+    const position = parsePosition((firstPosition ?? null) as VesselApiPayload)
+
+    if (!position) {
+        return {
+            position: null,
+            reason: `${idType.toUpperCase()} historical-position lookup returned no coordinates`,
+        }
+    }
+
+    return { position, reason: null }
+}
+
+async function fetchStaticVesselByIdentifier(
+    identifier: string,
+    idType: VesselPositionSeedSource
+): Promise<{ found: boolean; reason: string | null }> {
+    const response = await fetchJson<{ vessel?: Record<string, unknown>; error?: { message?: unknown }; message?: unknown; detail?: unknown }>(
+        `https://api.vesselapi.com/v1/vessel/${encodeURIComponent(identifier)}?filter.idType=${idType}`
+    )
+
+    if (!response.ok) {
+        return {
+            found: false,
+            reason: `${idType.toUpperCase()} static-vessel lookup failed: ${getErrorMessage(
+                response.payload as VesselApiPayload,
+                response.status
+            )}`,
+        }
+    }
+
+    return {
+        found: Boolean(response.payload?.vessel),
+        reason: response.payload?.vessel
+            ? `${idType.toUpperCase()} vessel exists but VesselAPI has no position data in the last 30 days`
+            : `${idType.toUpperCase()} static-vessel lookup returned no vessel`,
+    }
+}
+
+async function fetchByIdentifier(
+    identifier: string,
+    idType: VesselPositionSeedSource
+): Promise<{ position: SeededVesselPosition | null; reason: string | null }> {
+    const latestResult = await fetchLatestPositionByIdentifier(identifier, idType)
+
+    if (latestResult.position) {
+        return latestResult
+    }
+
+    const historicalResult = await fetchHistoricalPositionByIdentifier(identifier, idType)
+
+    if (historicalResult.position) {
+        return historicalResult
+    }
+
+    const staticResult = await fetchStaticVesselByIdentifier(identifier, idType)
+
+    if (staticResult.found) {
+        return {
+            position: null,
+            reason: staticResult.reason,
+        }
+    }
+
+    return {
+        position: null,
+        reason: [latestResult.reason, historicalResult.reason, staticResult.reason]
+            .filter(Boolean)
+            .join(" | "),
+    }
 }
 
 export async function fetchSeededVesselPosition(params: {

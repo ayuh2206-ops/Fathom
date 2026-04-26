@@ -1,5 +1,6 @@
 import { getDashboardAccessContext } from "@/lib/dashboard-access"
 import { getFirebaseFirestore } from "@/lib/firebase-admin"
+import { fetchSeededVesselPosition } from "@/lib/vessel-api"
 import { FieldValue, Timestamp } from "firebase-admin/firestore"
 import { NextResponse } from "next/server"
 import { z } from "zod"
@@ -148,6 +149,7 @@ export async function POST(req: Request) {
 
         const firestore = getFirebaseFirestore()
         const mmsi = parsed.data.mmsi.trim()
+        const seededPosition = await fetchSeededVesselPosition(mmsi)
         const trackedVesselId = getTrackedVesselId(access.organizationId, mmsi)
         const trackedRef = firestore.collection("trackedVessels").doc(trackedVesselId)
         const vesselRef = firestore.collection("vessels").doc(trackedVesselId)
@@ -178,14 +180,14 @@ export async function POST(req: Request) {
                 mmsi,
                 imo: trackedPayload.imo,
                 type: trackedPayload.type,
-                lat: null,
-                lng: null,
-                heading: 0,
-                speed: 0,
+                lat: seededPosition?.latitude ?? null,
+                lng: seededPosition?.longitude ?? null,
+                heading: seededPosition?.heading ?? 0,
+                speed: seededPosition?.speed ?? 0,
                 status: "unknown",
                 nextPort: "Unknown",
                 eta: "Unavailable",
-                lastUpdated: FieldValue.serverTimestamp(),
+                lastUpdated: seededPosition?.lastUpdated ?? FieldValue.serverTimestamp(),
                 source: "manual",
             },
             { merge: true }
@@ -198,14 +200,14 @@ export async function POST(req: Request) {
                     mmsi,
                     imo: trackedPayload.imo,
                     type: trackedPayload.type,
-                    lat: null,
-                    lng: null,
-                    heading: 0,
-                    speed: 0,
+                    lat: seededPosition?.latitude ?? null,
+                    lng: seededPosition?.longitude ?? null,
+                    heading: seededPosition?.heading ?? 0,
+                    speed: seededPosition?.speed ?? 0,
                     status: "unknown",
                     nextPort: "Unknown",
                     eta: "Unavailable",
-                    lastUpdated: new Date(),
+                    lastUpdated: seededPosition?.lastUpdated ?? new Date(),
                     source: "manual",
                 }),
             },

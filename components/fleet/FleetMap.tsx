@@ -18,39 +18,66 @@ interface FleetMapProps {
 export default function FleetMap({ vessels }: FleetMapProps) {
     const [popupInfo, setPopupInfo] = useState<FleetVessel | null>(null)
 
-    const markers = useMemo(() => vessels
-        .filter((vessel) => Number.isFinite(vessel.lat) && Number.isFinite(vessel.lng))
-        .map(vessel => (
-        <Marker
-            key={vessel.id}
-            longitude={vessel.lng ?? 0}
-            latitude={vessel.lat ?? 0}
-            anchor="center"
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            onClick={(e: any) => {
-                e.originalEvent.stopPropagation();
-                setPopupInfo(vessel);
-            }}
-        >
-            <div
-                className="cursor-pointer transition-transform duration-300 hover:scale-125"
-                style={{
-                    transform: `rotate(${vessel.heading}deg)`,
-                    width: '24px',
-                    height: '24px',
-                    background: '#0ea5e9',
-                    borderRadius: '50%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    border: '2px solid white',
-                    boxShadow: '0 0 10px rgba(14, 165, 233, 0.5)'
-                }}
-            >
-                <div style={{ width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderBottom: '10px solid white', transform: 'translateY(-2px)' }} />
-            </div>
-        </Marker>
-    )), [vessels]);
+    const positionedVessels = useMemo(
+        () =>
+            vessels.filter(
+                (vessel) => Number.isFinite(vessel.lat) && Number.isFinite(vessel.lng)
+            ),
+        [vessels]
+    )
+
+    const unpositionedVessels = useMemo(
+        () =>
+            vessels.filter(
+                (vessel) => !Number.isFinite(vessel.lat) || !Number.isFinite(vessel.lng)
+            ),
+        [vessels]
+    )
+
+    const markers = useMemo(
+        () =>
+            positionedVessels.map((vessel) => (
+                <Marker
+                    key={vessel.id}
+                    longitude={vessel.lng ?? 0}
+                    latitude={vessel.lat ?? 0}
+                    anchor="center"
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    onClick={(e: any) => {
+                        e.originalEvent.stopPropagation()
+                        setPopupInfo(vessel)
+                    }}
+                >
+                    <div
+                        className="cursor-pointer transition-transform duration-300 hover:scale-125"
+                        style={{
+                            transform: `rotate(${vessel.heading}deg)`,
+                            width: "24px",
+                            height: "24px",
+                            background: "#0ea5e9",
+                            borderRadius: "50%",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            border: "2px solid white",
+                            boxShadow: "0 0 10px rgba(14, 165, 233, 0.5)",
+                        }}
+                    >
+                        <div
+                            style={{
+                                width: 0,
+                                height: 0,
+                                borderLeft: "6px solid transparent",
+                                borderRight: "6px solid transparent",
+                                borderBottom: "10px solid white",
+                                transform: "translateY(-2px)",
+                            }}
+                        />
+                    </div>
+                </Marker>
+            )),
+        [positionedVessels]
+    )
 
     if (!MAPBOX_TOKEN) {
         return (
@@ -118,6 +145,21 @@ export default function FleetMap({ vessels }: FleetMapProps) {
                     </Popup>
                 )}
             </Map>
+
+            {vessels.length > 0 && positionedVessels.length === 0 && (
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-6">
+                    <Card className="max-w-lg border-amber-500/20 bg-slate-950/92 p-5 text-center shadow-2xl">
+                        <h3 className="text-lg font-semibold text-white">Waiting For Vessel Coordinates</h3>
+                        <p className="mt-2 text-sm text-slate-300">
+                            This vessel is tracked, but the map only renders ships after a position
+                            source provides latitude and longitude.
+                        </p>
+                        <p className="mt-3 text-xs text-slate-400">
+                            Awaiting position for {unpositionedVessels.map((vessel) => vessel.name).join(", ")}.
+                        </p>
+                    </Card>
+                </div>
+            )}
 
             {/* Map Legend Overlay */}
             <Card className="absolute bottom-4 left-4 p-4 bg-slate-950/90 border-white/10 backdrop-blur-sm shadow-xl z-[1000] w-48">

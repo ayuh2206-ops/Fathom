@@ -1,6 +1,7 @@
 import "server-only"
 
 import { HAIKU, MARITIME_SYSTEM_PROMPT, anthropic } from "@/lib/anthropic-client"
+import type { PortTariff } from "@/lib/port-tariffs"
 
 export interface ExtractedInvoiceFields {
     invoiceNumber: string | null
@@ -645,7 +646,7 @@ export async function extractInvoiceFields(fileBuffer: Buffer, mimeType: string)
 
 export async function analyzeForFraud(
     extractedFields: ExtractedInvoiceFields,
-    portTariff: unknown | null,
+    portTariff: PortTariff | null,
     aisData: unknown | null,
     agentHistory: unknown | null,
     historicalContext: FraudHistoricalContext

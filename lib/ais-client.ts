@@ -1,6 +1,6 @@
 import "server-only"
 
-import WebSocket from "ws"
+import { getNodeWebSocket } from "@/lib/ws-server"
 
 export interface AISStreamResult {
     found: boolean
@@ -80,6 +80,7 @@ export async function checkVesselPosition(
     }
 
     const portCoords = PORT_COORDINATES[portLocode.toUpperCase()]
+    const WebSocket = await getNodeWebSocket()
 
     return new Promise((resolve) => {
         let settled = false

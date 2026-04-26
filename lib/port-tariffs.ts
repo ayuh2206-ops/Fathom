@@ -2,6 +2,27 @@ import "server-only"
 
 import { getFirebaseFirestore } from "@/lib/firebase-admin"
 
+export type PortTariffRateBracket = {
+    gtMin: number
+    gtMax: number
+    rate: number
+}
+
+export type PortTariffService = {
+    unit: string
+    rate?: number
+    minHours?: number
+    rates?: PortTariffRateBracket[]
+}
+
+export type PortTariff = {
+    portName: string
+    country: string
+    currency: string
+    services: Record<string, PortTariffService>
+    sourceUrl: string
+}
+
 const PORT_TARIFFS = {
     NLRTM: {
         portName: "Port of Rotterdam",
@@ -169,13 +190,32 @@ const PORT_TARIFFS = {
         },
         sourceUrl: "https://www.olp.gr/en/port-tariffs",
     },
-} as const
+} satisfies Record<string, PortTariff>
 
-export async function getPortTariff(portLocode: string): Promise<unknown | null> {
+function isPortTariff(value: unknown): value is PortTariff {
+    if (!value || typeof value !== "object") {
+        return false
+    }
+
+    const candidate = value as Partial<PortTariff>
+
+    return (
+        typeof candidate.portName === "string" &&
+        typeof candidate.country === "string" &&
+        typeof candidate.currency === "string" &&
+        typeof candidate.sourceUrl === "string" &&
+        !!candidate.services &&
+        typeof candidate.services === "object"
+    )
+}
+
+export async function getPortTariff(portLocode: string): Promise<PortTariff | null> {
     try {
         const firestore = getFirebaseFirestore()
         const doc = await firestore.collection("portTariffs").doc(portLocode.toUpperCase()).get()
-        return doc.exists ? doc.data() ?? null : null
+        const data = doc.exists ? doc.data() ?? null : null
+
+        return isPortTariff(data) ? data : null
     } catch (error) {
         console.warn("Failed to fetch port tariff:", error)
         return null

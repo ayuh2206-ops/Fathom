@@ -1,5 +1,5 @@
+import { getNodeWebSocket } from "@/lib/ws-server"
 import { NextResponse } from 'next/server';
-import WebSocket from 'ws';
  
 export const dynamic = 'force-dynamic';
  
@@ -9,6 +9,7 @@ export async function GET() {
    return NextResponse.json([]);
  }
 
+ const WebSocket = await getNodeWebSocket()
  const vessels = await new Promise<object[]>((resolve) => {
    const ws = new WebSocket('wss://stream.aisstream.io/v0/stream');
    const data: object[] = [];

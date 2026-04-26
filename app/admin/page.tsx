@@ -76,37 +76,50 @@ export default async function AdminPanelPage() {
         redirect("/")
     }
 
-    const firestore = getFirebaseFirestore()
+    // Gracefully handle missing Firebase config — show empty state instead of crashing
+    let users: Array<{ id: string } & FirestoreUser> = []
+    let invoices: Array<{ id: string } & FirestoreInvoice> = []
+    let organizationsMap = new Map<string, { id: string; name: string; plan: string }>()
+    let organizationsCount = 0
+    let dbError: string | null = null
 
-    const [usersSnapshot, invoicesSnapshot, organizationsSnapshot] = await Promise.all([
-        firestore.collection("users").get(),
-        firestore.collection("invoices").get(),
-        firestore.collection("organizations").get(),
-    ])
+    try {
+        const firestore = getFirebaseFirestore()
+        const [usersSnapshot, invoicesSnapshot, organizationsSnapshot] = await Promise.all([
+            firestore.collection("users").get(),
+            firestore.collection("invoices").get(),
+            firestore.collection("organizations").get(),
+        ])
 
-    const users = usersSnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...(doc.data() as FirestoreUser),
-    }))
+        users = usersSnapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...(doc.data() as FirestoreUser),
+        }))
 
-    const organizationsMap = new Map(
-        organizationsSnapshot.docs.map((doc) => {
-            const data = doc.data() as FirestoreOrganization
-            return [
-                doc.id,
-                {
-                    id: doc.id,
-                    name: data.name || "Unnamed Organization",
-                    plan: data.subscriptionPlan || "unknown",
-                },
-            ] as const
-        })
-    )
+        organizationsMap = new Map(
+            organizationsSnapshot.docs.map((doc) => {
+                const data = doc.data() as FirestoreOrganization
+                return [
+                    doc.id,
+                    {
+                        id: doc.id,
+                        name: data.name || "Unnamed Organization",
+                        plan: data.subscriptionPlan || "unknown",
+                    },
+                ] as const
+            })
+        )
 
-    const invoices = invoicesSnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...(doc.data() as FirestoreInvoice),
-    }))
+        invoices = invoicesSnapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...(doc.data() as FirestoreInvoice),
+        }))
+
+        organizationsCount = organizationsSnapshot.size
+    } catch (err) {
+        dbError = err instanceof Error ? err.message : "Unknown database error"
+        console.error("[admin/page] Firebase fetch failed:", dbError)
+    }
 
     const totalInvoiceAmount = invoices.reduce((sum, invoice) => sum + (invoice.amount || 0), 0)
     const flaggedInvoices = invoices.filter((invoice) => invoice.status === "flagged").length
@@ -142,6 +155,12 @@ export default async function AdminPanelPage() {
                     </div>
                 </header>
 
+                {dbError && (
+                    <div className="rounded-xl border border-yellow-500/20 bg-yellow-500/5 px-5 py-4 text-sm text-yellow-300">
+                        <strong>⚠ Database unavailable:</strong> {dbError}. Set Firebase environment variables in Vercel to restore live data.
+                    </div>
+                )}
+
                 <section className="grid gap-4 md:grid-cols-4">
                     <div className="rounded-xl border border-white/10 bg-slate-900/60 p-5">
                         <p className="text-xs uppercase tracking-wider text-slate-400">Total Users</p>
@@ -149,7 +168,7 @@ export default async function AdminPanelPage() {
                     </div>
                     <div className="rounded-xl border border-white/10 bg-slate-900/60 p-5">
                         <p className="text-xs uppercase tracking-wider text-slate-400">Organizations</p>
-                        <p className="mt-2 text-3xl font-bold text-white">{organizationsSnapshot.size}</p>
+                        <p className="mt-2 text-3xl font-bold text-white">{organizationsCount}</p>
                     </div>
                     <div className="rounded-xl border border-white/10 bg-slate-900/60 p-5">
                         <p className="text-xs uppercase tracking-wider text-slate-400">Invoices (Total)</p>

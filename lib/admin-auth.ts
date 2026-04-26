@@ -38,8 +38,12 @@ function safeEqual(a: string, b: string): boolean {
     return timingSafeEqual(aBuffer, bBuffer)
 }
 
-function signPayload(payload: string): string {
-    return createHmac("sha256", getAdminSecret()).update(payload).digest("base64url")
+function signPayload(payload: string): string | null {
+    try {
+        return createHmac("sha256", getAdminSecret()).update(payload).digest("base64url")
+    } catch {
+        return null
+    }
 }
 
 /**
@@ -61,6 +65,7 @@ export function createAdminSessionToken(username: string): string {
 
     const encodedPayload = Buffer.from(JSON.stringify(payload), "utf8").toString("base64url")
     const signature = signPayload(encodedPayload)
+    if (!signature) return ""
 
     return `${encodedPayload}.${signature}`
 }
@@ -70,13 +75,18 @@ export function verifyAdminSessionToken(token?: string | null): boolean {
         return false
     }
 
+    // If admin env vars are not configured, tokens can never be valid
+    if (!isAdminAuthConfigured()) {
+        return false
+    }
+
     const [encodedPayload, signature] = token.split(".")
     if (!encodedPayload || !signature) {
         return false
     }
 
     const expectedSignature = signPayload(encodedPayload)
-    if (!safeEqual(signature, expectedSignature)) {
+    if (!expectedSignature || !safeEqual(signature, expectedSignature)) {
         return false
     }
 
@@ -91,7 +101,11 @@ export function verifyAdminSessionToken(token?: string | null): boolean {
             return false
         }
 
-        if (payload.sub !== getAdminUsername()) {
+        try {
+            if (payload.sub !== getAdminUsername()) {
+                return false
+            }
+        } catch {
             return false
         }
 
